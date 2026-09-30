@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { width: 380px; font-family: "Microsoft YaHei UI", system-ui; font-size: 13px; color: #222; }
+  header { background: #161823; color: #fff; padding: 10px 12px; font-weight: bold; font-size: 14px; }
+  .promo { display:flex; align-items:center; justify-content:space-between; gap:8px;
+           background: linear-gradient(90deg,#ff2c55,#7b2ff7); color:#fff;
+           padding: 8px 12px; font-size: 13px; }
+  .promo a { color: #fff; font-weight: bold; text-decoration: underline; }
+  .promo .arrow { font-size: 15px; }
+  .sec { padding: 10px 12px; border-bottom: 1px solid #eee; }
+  .lbl { font-size: 11px; color: #888; margin-bottom: 4px; }
+  input[type=text], input[type=password] { width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+  .row { display: flex; gap: 6px; margin-top: 6px; }
+  button { padding: 6px 10px; border: 1px solid #d9d9d9; background: #fff; border-radius: 4px; cursor: pointer; font-size: 13px; }
+  button.primary { background: #fe2c55; color: #fff; border-color: #fe2c55; }
+  button:disabled { opacity: .5; cursor: default; }
+  #status { font-size: 12px; color: #0a7; padding: 0 12px 8px; min-height: 16px; }
+  #list { max-height: 180px; overflow-y: auto; }
+  .item { padding: 6px 12px; border-bottom: 1px solid #f2f2f2; cursor: pointer; display:flex; gap:8px; }
+  .item:hover { background: #fff2f4; }
+  .item .t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item .hot { color: #fe2c55; font-size: 11px; }
+  #drafts { padding: 8px 12px; }
+  .draft { margin-bottom: 8px; padding: 6px 8px; border: 1px solid #eee; border-radius: 6px; }
+  .draft .txt { font-size: 13px; }
+  .draft .use { margin-top: 4px; text-align: right; }
+  .draft button { font-size: 12px; color: #fe2c55; border-color: #fe2c55; }
+  .cfg input { margin-top: 4px; }
+  .foot { font-size: 11px; color: #aaa; padding: 8px 12px; }
+</style>
+</head>
+<body>
+<header>抖音热门视频自动回复助手</header>
+<div class="promo">
+  <span>🤖 没有模型？注册即送额度</span>
+  <a href="https://ai.88531.cn" target="_blank">ai.88531.cn 注册 →</a>
+</div>
+
+<div class="sec cfg">
+  <div class="lbl">LLM 配置（OpenAI 兼容接口，保存在本插件里）</div>
+  <input type="text" id="baseUrl" placeholder="https://ai.88531.cn/v1">
+  <input type="password" id="apiKey" placeholder="API Key" style="margin-top:4px">
+  <input type="text" id="model" placeholder="模型名，默认 deepseek-v4.1-flash">
+  <div class="row">
+    <button id="saveCfg">保存配置</button>
+    <button id="testCfg">测试连接</button>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="lbl">视频来源</div>
+  <div class="row">
+    <button id="btnHot" class="primary">抓取当前页面视频</button>
+  </div>
+  <div class="row">
+    <input type="text" id="kw" placeholder="关键词，在抖音站内搜">
+    <button id="btnSearch">搜索</button>
+  </div>
+</div>
+
+<div id="status"></div>
+<div id="list"></div>
+<div id="drafts"></div>
+
+<div class="foot">选一条视频 → LLM 生成文案 → 点「填入」→ 回到页面评论区手动点发送（零封号风险）</div>
+
+<script src="popup.js"></script>
+</body>
+</html>

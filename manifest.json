@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "抖音热门视频自动回复助手",
+  "version": "1.8.5",
+  "description": "在抖音网页版里搜索/查看热门视频，LLM生成仿真人互动文案，一键填入评论框（半自动发送，零封号风险）",
+  "permissions": ["storage", "activeTab", "scripting", "tabs", "sidePanel"],
+  "host_permissions": [
+    "https://www.douyin.com/*",
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "side_panel": { "default_path": "sidepanel.html" },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "抖音自动回复助手"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.douyin.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
