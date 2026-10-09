@@ -143,11 +143,8 @@
       if (window.__dyAutoStop) { report("已停止"); break; }
       if (sent >= maxN) break;
       try {
-        report("→ " + (sent + 1) + "/" + maxN + " 点击卡片: " + it.title);
+        report("→ " + (sent + 1) + "/" + maxN + " 打开: " + it.title);
         showStep((sent + 1) + "/" + maxN + " 正在点开视频: " + (it.title || "").slice(0, 24));
-        // 像真人一样：滚到卡片位置 → 鼠标按下抬起点击卡片进入视频（不用 location.href 硬跳）
-        const el = findCardElement(it);
-        if (!el) { report("没找到该卡片DOM，跳过"); continue; }
         sessionStorage.setItem("dyAutoState", JSON.stringify({
           maxN, gapSec, sent,
           remaining: maxN - sent,
@@ -156,8 +153,16 @@
           customText: custom,
           customImg: customImg
         }));
-        await humanClick(el);   // 真实鼠标事件点击，浏览器自己跳转（SPA路径）
-        return;                 // 页面推进入视频页后，本脚本在新页续跑
+        // ① 先像真人一样点击卡片；② 抖音可能校验 isTrusted 忽略合成事件 → 检测是否跳转，没跳就直接导航
+        const beforeUrl = location.href;
+        const el = findCardElement(it);
+        if (el) { await humanClick(el); await sleep(1800); }
+        if (location.href === beforeUrl || !location.pathname.startsWith("/video/")) {
+          report(el ? "点击未跳转(isTrusted被拒)，改用页面导航" : "卡片DOM没找到，直接导航到视频");
+          showStep((sent + 1) + "/" + maxN + " 导航到视频页…");
+          location.href = it.href;
+        }
+        return;   // 新页面的 auto.js 接管
       } catch (e) {
         report("单条失败: " + String(e));
         await sleep(3000);
