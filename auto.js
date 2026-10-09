@@ -312,6 +312,15 @@
     });
   }
 
+
+  // 任何失败都弹（不依赖验证码检测）：用户处理完点继续 → 返回 true 让上层重试
+  async function waitUserFix(reason) {
+    report("流程受阻，已弹出人工介入提示: " + String(reason).slice(0, 60));
+    showStep("⚠ 请人工处理: " + String(reason).slice(0, 24), "fail");
+    const ok = await alertVerify(reason);
+    return ok;
+  }
+
   function findCardElement(it) {
     const href = it.href || "";
     const vidId = href.split("/video/")[1];
@@ -437,6 +446,12 @@
         let r;
         try { r = await postOnce(state.gapSec, state); }
         catch (ex) { r = "连接/执行异常: " + String(ex).slice(0, 60); }
+        for (let t = 0; t < 2 && r === "RETRY"; t++) {
+          report("用户已处理，自动重试(" + (t + 1) + "/2)…");
+          await sleep(2000);
+          try { r = await postOnce(state.gapSec, state); }
+          catch (ex) { r = "连接/执行异常: " + String(ex).slice(0, 60); }
+        }
         // 增强版AI：失败自动自愈（视觉/文本→动作→执行→重试）
         if (state.enhanced && r !== "OK" && r !== "OK(enter)" && r !== "STOPPED") {
           for (let k = 1; k <= 2 && r !== "OK" && r !== "OK(enter)"; k++) {
@@ -708,6 +723,7 @@
       if (!editor) {
         const st = buildDomState();
         report("DOM事实: " + st);
+        if (await waitUserFix("找不到评论框（已滚到底部）——若是滑块请滑完；若评论区已可见请点一下评论框")) return "RETRY";
         return "no_editor（已滚到底部仍无输入框；" + st + "）";
       }
     }
@@ -762,7 +778,10 @@
       await sleep(50 + Math.random() * 110);
       if (Math.random() < 0.08) await sleep(200 + Math.random() * 300);
     }
-    if (!isCE && !isField) return "editor_not_typeable（评论框类型不支持输入）";
+    if (!isCE && !isField) {
+      if (await waitUserFix("评论框类型不支持自动输入——请人工输入并发送")) return "RETRY";
+      return "editor_not_typeable（评论框类型不支持输入）";
+    }
     await sleep(600 + rand(0, 800));
     if (isCaptchaNow()) return "\u8f93\u5165\u540e\u5f39\u9a8c\u8bc1\u7801\uff0c\u672a\u53d1\u9001";
 
@@ -798,7 +817,10 @@
           ["发送", "发布", "提交"].includes((b.textContent || "").trim()) &&
           b.getBoundingClientRect().height > 0);
       }
-      if (!sb) return "submit_failed（回车没提交也没找到发送按钮）";
+      if (!sb) {
+        if (await waitUserFix("回车没提交也没找到发送按钮——请人工点一下发送")) return "RETRY";
+        return "submit_failed（回车没提交也没找到发送按钮）";
+      }
       await humanClick(sb);
       await sleep(1500);
     }
