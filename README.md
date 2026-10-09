@@ -34,7 +34,7 @@
 
 - LLM Base URL（默认 `https://ai.88531.cn/v1`，OpenAI 兼容，DeepSeek/Kimi/智谱/Ollama/NewAPI 均可）
 - API Key（密文）
-- 模型名（默认 `deepseek-v4.1-flash`）
+- 模型名（默认 `mimo-v2.6-flash`）
 - 全自动条数（默认3，上限20）/ 发评间隔秒（默认90，最低15）——保存后跨会话记忆
 
 ## 📦 安装

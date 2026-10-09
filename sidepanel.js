@@ -17,7 +17,7 @@ async function loadCfg() {
     "city", "autoKeywords", "autoReplyText", "kwAutoOn", "autoImageDataUrl"]);
   $("baseUrl").value = c.baseUrl || "https://ai.88531.cn/v1";
   $("apiKey").value = c.apiKey || "";
-  $("model").value = c.model || "deepseek-v4.1-flash";
+  $("model").value = c.model || "mimo-v2.6-flash";
   if (c.autoMaxN) $("maxN").value = c.autoMaxN;
   if (c.autoGapSec) $("gapSec").value = c.autoGapSec;
   if (c.city) $("city").value = c.city;
