@@ -90,6 +90,21 @@
       report("当前页面没抓到视频 — 请先打开网站搜索结果页或视频列表页再点「开始自动」");
       return;
     }
+    // 关键词自动回复：命中标题的帖子优先，只回匹配的
+    let rule = {};
+    try { rule = await chrome.storage.local.get(["kwAutoOn", "autoKeywords", "autoReplyText", "autoImageDataUrl"]); } catch {}
+    const kws = String(rule.autoKeywords || "").split(/\n+/).map(x => x.trim()).filter(x => x.length > 0);
+    if (rule.kwAutoOn && kws.length) {
+      const matched = items.filter(it => kws.some(k => (it.title || "").includes(k)));
+      if (!matched.length) {
+        report("关键词模式开启，但本页没命中任何关键词(" + kws.join("/") + ")，跳过");
+        return;
+      }
+      items = matched;
+      report("关键词命中 " + items.length + " 条，只回这些");
+    }
+    const custom = (rule.kwAutoOn && rule.autoReplyText) ? String(rule.autoReplyText) : "";
+    const customImg = (rule.kwAutoOn && rule.autoImageDataUrl) ? String(rule.autoImageDataUrl) : "";
     report("来源页面: " + location.href.slice(0, 80));
     report("只评论本页前 " + Math.min(items.length, maxN) + " 条（共" + items.length + "条），开始循环");
     let sent = 0;
@@ -105,7 +120,9 @@
           maxN, gapSec, sent,
           remaining: maxN - sent,
           title: it.title,
-          listUrl: location.href
+          listUrl: location.href,
+          customText: custom,
+          customImg: customImg
         }));
         await humanClick(el);   // 真实鼠标事件点击，浏览器自己跳转（SPA路径）
         return;                 // 页面推进入视频页后，本脚本在新页续跑
@@ -128,7 +145,7 @@
       report(`进入视频页: ${state.title}，等页面稳定...`);
       await sleep(5000);
       if (location.pathname.startsWith("/video/")) {
-        const r = await postOnce(state.gapSec);
+        const r = await postOnce(state.gapSec, state);
         if (r === "OK") { state.sent++; report(`已发送 ${state.sent} 条`); }
         else report("未成功: " + r);
         // 等待间隔
@@ -242,7 +259,9 @@
     return null;
   }
 
-  async function postOnce(gapSec) {
+  async function postOnce(gapSec, state) {
+    const customText = (state && state.customText) || "";
+    const customImg = (state && state.customImg) || "";
     // 验证码检测（每一步都断）
     if ((document.title || "").includes("验证码") ||
         document.querySelector('iframe[src*="verifycenter"], iframe[src*="captcha"]')) {
@@ -250,17 +269,22 @@
     }
 
     const title = document.title.replace(/ - 抖音|｜抖音/g, "").trim() || document.title;
-    const resp = await chrome.runtime.sendMessage({ action: "llm",
-      prompt: "为抖音视频《" + title + "》写1条15字内仿真人互动评论，只输出JSON数组如[\"文本\"]" });
-    if (!resp || resp.error) return "LLM失败: " + (resp && resp.error || "no resp");
     let text;
-    try {
-      const raw = String(resp.content || "").trim().replace(/^```(json)?\s*|\s*```$/g, "").trim();
-      const arr = JSON.parse(raw);
-      text = Array.isArray(arr) ? String(arr[0] || "") : "";
-    } catch { return "LLM解析失败: " + String(resp.content).slice(0, 80); }
-    if (!text || typeof text !== "string") return "LLM返回文本为空";
-    report("评论文案: " + text);
+    if (customText) {
+      text = customText;
+      report("使用自定义回复文案: " + text.slice(0, 40));
+    } else {
+      const resp = await chrome.runtime.sendMessage({ action: "llm",
+        prompt: "为抖音视频《" + title + "》写1条15字内仿真人互动评论，只输出JSON数组如[\"文本\"]" });
+      if (!resp || resp.error) return "LLM失败: " + (resp && resp.error || "no resp");
+      try {
+        const raw = String(resp.content || "").trim().replace(/^```(json)?\s*|\s*```$/g, "").trim();
+        const arr = JSON.parse(raw);
+        text = Array.isArray(arr) ? String(arr[0] || "") : "";
+      } catch { return "LLM解析失败: " + String(resp.content).slice(0, 80); }
+      if (!text || typeof text !== "string") return "LLM返回文本为空";
+      report("评论文案: " + text);
+    }
 
     // ── 仿人流程 ──
     // 1. 模拟看完视频再操作（等3~6s）
@@ -286,6 +310,27 @@
     const inner = (editor.getAttribute("contenteditable") === "true") ? editor
       : (editor.querySelector('div[contenteditable="true"]') || editor);
     inner.focus();
+
+    // 3.5 附图（若配置了图片）
+    if (customImg) {
+      try {
+        const fi = [...document.querySelectorAll('input[type=file]')].find(el => {
+          const r = el.getBoundingClientRect();
+          return r.width > 0 || el.offsetParent !== null;
+        }) || document.querySelector('input[type=file]');
+        if (fi) {
+          const resp2 = await fetch(customImg);
+          const blob = await resp2.blob();
+          const file = new File([blob], "reply.jpg", { type: blob.type || "image/jpeg" });
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          fi.files = dt.files;
+          fi.dispatchEvent(new Event("change", { bubbles: true }));
+          report("图片已附加 ✓");
+          await sleep(1200 + rand(0, 800));
+        } else report("没找到图片上传入口，仅发文字");
+      } catch (e) { report("附图失败(不影响文字): " + String(e)); }
+    }
 
     // 4. 逐字输入（模拟打字节奏 60~180ms/字，带偶发停顿）
     report("逐字输入评论...");

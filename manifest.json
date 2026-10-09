@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "抖音热门视频自动回复助手",
-  "version": "1.8.5",
+  "version": "1.9.0",
   "description": "在抖音网页版里搜索/查看热门视频，LLM生成仿真人互动文案，一键填入评论框（半自动发送，零封号风险）",
   "permissions": ["storage", "activeTab", "scripting", "tabs", "sidePanel"],
   "host_permissions": [

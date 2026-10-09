@@ -12,10 +12,52 @@ const status = (s, bad = false) => { $("status").textContent = s; $("status").st
 
 // ── 配置 ──
 async function loadCfg() {
-  const c = await chrome.storage.local.get(["baseUrl", "apiKey", "model"]);
+  const c = await chrome.storage.local.get([
+    "baseUrl", "apiKey", "model", "autoMaxN", "autoGapSec",
+    "city", "autoKeywords", "autoReplyText", "kwAutoOn", "autoImageDataUrl"]);
   $("baseUrl").value = c.baseUrl || "https://ai.88531.cn/v1";
   $("apiKey").value = c.apiKey || "";
   $("model").value = c.model || "deepseek-v4.1-flash";
+  if (c.autoMaxN) $("maxN").value = c.autoMaxN;
+  if (c.autoGapSec) $("gapSec").value = c.autoGapSec;
+  if (c.city) $("city").value = c.city;
+  if (c.autoKeywords) $("autoKeywords").value = c.autoKeywords;
+  if (c.autoReplyText) $("autoReplyText").value = c.autoReplyText;
+  if (c.kwAutoOn) $("kwAutoOn").checked = true;
+  if (c.autoImageDataUrl) {
+    $("imgPreview").src = c.autoImageDataUrl;
+    $("imgPreview").style.display = "block";
+  }
+}
+
+// 关键词自动回复规则：保存 + 图片转 dataURL
+$("saveAutoRule").onclick = async () => {
+  const rule = {
+    autoKeywords: $("autoKeywords").value,
+    autoReplyText: $("autoReplyText").value,
+    kwAutoOn: $("kwAutoOn").checked
+  };
+  const f = $("autoImage").files && $("autoImage").files[0];
+  if (f) {
+    const dataUrl = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result);
+      r.onerror = rej;
+      r.readAsDataURL(f);
+    });
+    rule.autoImageDataUrl = dataUrl;
+    $("imgPreview").src = dataUrl;
+    $("imgPreview").style.display = "block";
+  }
+  await chrome.storage.local.set(rule);
+  _ruleCache = { autoKeywords: rule.autoKeywords, kwAutoOn: rule.kwAutoOn };
+  status("关键词自动回复规则已保存" + (rule.kwAutoOn ? "（已启用）" : "（未启用）"));
+};
+
+// 全自动启动前记忆条数/间隔
+async function saveAutoCounts() {
+  await chrome.storage.local.set({ autoMaxN: Number($("maxN").value) || 3,
+    autoGapSec: Number($("gapSec").value) || 90 });
 }
 $("saveCfg").onclick = async () => {
   await chrome.storage.local.set({
@@ -78,7 +120,10 @@ $("btnHot").onclick = async () => {
 };
 
 $("btnSearch").onclick = async () => {
-  const kw = $("kw").value.trim();
+  const city = ($("city").value || "").trim();
+  const base = $("kw").value.trim();
+  if (city) chrome.storage.local.set({ city });
+  const kw = city && base ? (city + " " + base) : base;
   if (!kw) return status("请输入关键词", true);
   status("搜索中...");
   try {

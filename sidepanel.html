@@ -42,6 +42,12 @@
   .hist:hover { background:#fff2f4; }
   .hist .t { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .hist .m { color:#aaa; font-size:10px; }
+  #watchBox { max-height: 240px; overflow-y: auto; background:#14161f; color:#c5fff2;
+    font-family: Consolas, monospace; font-size: 12px; padding: 8px 10px; border-radius: 6px;
+    margin: 6px 12px; line-height: 1.55; }
+  #watchBox .step { color: #ffd76e; }
+  #watchBox .okline { color: #8ef7b7; }
+  #watchBox .fail { color: #ff7b72; }
 </style>
 </head>
 <body>
@@ -88,11 +94,27 @@
 <div class="sec">
   <div class="lbl">执行回复（搜索/抓取视频 → 生成文案 → 回复）</div>
   <div class="row">
-    <input type="text" id="kw" placeholder="输入关键词，回车搜">
+    <input type="text" id="city" placeholder="固定城市，如：杭州" style="width:40%">
+    <input type="text" id="kw" placeholder="关键词，回车搜">
     <button id="btnSearch">搜索</button>
   </div>
   <div class="row" style="margin-top:4px">
     <button id="btnHot" class="primary" style="flex:1">抓取当前页面视频</button>
+  </div>
+  <div class="lbl" style="margin-top:4px">填了城市后搜索自动带城市前缀（如「杭州 宽带」），城市会被记住</div>
+</div>
+
+<div class="sec">
+  <div class="lbl">🎯 关键词自动回复（帖子标题含关键词 → 自动用自定义文字/图片回复）</div>
+  <textarea id="autoKeywords" rows="2" placeholder="关键词每行一个，例如：&#10;宽带&#10;装宽带&#10;网络办理"></textarea>
+  <textarea id="autoReplyText" rows="2" placeholder="自动回复文字（只发图片可留空）" style="margin-top:4px"></textarea>
+  <div class="row">
+    <label style="font-size:12px;cursor:pointer"><input type="file" id="autoImage" accept="image/*" style="width:150px;font-size:11px"> 附图(可选)</label>
+  </div>
+  <img id="imgPreview" alt="" style="max-width:140px;max-height:80px;border:1px solid #ddd;border-radius:4px;margin-top:4px;display:none">
+  <div class="row">
+    <label style="font-size:12px"><input type="checkbox" id="kwAutoOn"> 启用（全自动时只回匹配的帖子）</label>
+    <button id="saveAutoRule">保存规则</button>
   </div>
 </div>
 
@@ -111,6 +133,8 @@
     <button id="btnAuto" class="primary">开始自动</button>
     <button id="btnStopAuto" disabled>停止</button>
   </div>
+  <div class="lbl" style="margin-top:6px">📺 过程监视（每一步实时显示）</div>
+  <div id="watchBox" style="display:none"></div>
 </div>
 
 <div class="foot">选一条视频 → LLM 出3条候选 → 点选一条为主文案 → 「▶ 用这条回复该视频」自动打开视频并填入，你确认后点发送</div>
