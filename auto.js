@@ -195,7 +195,8 @@
         "抖音网页自动评论操作失败，你是操作教练。\n" +
         "失败原因: " + reason + "\n" +
         "DOM状态: " + dom + "\n" +
-        (img ? "截图里是当前页面，结合截图判断。\n" : "") +
+        (img ? "截图里是当前页面，结合截图判断；若截图里没有滑块弹窗就禁止输出滑块/验证码结论。\n" :
+        "captcha=false时禁止提及验证码/滑块/风控。\n") +
         "只输出一个JSON动作，不要解释：{\"action\":\"click|\"scroll|\"wait|\"giveup\",\"selector\":\"可选CSS选择器\",\"text\":\"可选按钮文字\",\"px\":数字,\"ms\":数字,\"reason\":\"一句话\"}";
       const resp = img
         ? await chrome.runtime.sendMessage({ action: "llmVision", dataUrl: img, prompt })
@@ -218,14 +219,18 @@
 
   function buildDomState() {
     try {
+      const capDetected = (document.title || "").includes("\u9a8c\u8bc1\u7801") ||
+        !!document.querySelector("iframe[src*=verifycenter], iframe[src*=captcha], div[class*=captcha]");
+      const commentEls = document.querySelectorAll("[data-e2e*=comment]").length;
       return "url=" + location.href.slice(0, 80) +
-        " | title=" + (document.title || "").slice(0, 40) +
+        " | ready=" + document.readyState +
+        " | viewportBottom=" + (window.scrollY + window.innerHeight >= document.body.scrollHeight - 40) +
         " | scrollY=" + Math.round(window.scrollY) + "/" + document.body.scrollHeight +
         " | 评论框=" + !!document.querySelector('div[contenteditable="true"]') +
         " | 评论按钮=" + !!document.querySelector('[data-e2e="comment-icon"]') +
         " | 发送按钮=" + !!document.querySelector('[data-e2e="comment-post"]') +
-        " | captcha=" + ((document.title || "").includes("\u9a8c\u8bc1\u7801") ||
-          !!document.querySelector("iframe[src*=verifycenter],iframe[src*=captcha]")) +
+        " | comment元素数=" + commentEls +
+        " | captcha=" + capDetected +
         " | 正文=" + (document.body.innerText || "").replace(/\s+/g, " ").slice(0, 120);
     } catch { return "(DOM读取失败)"; }
   }
@@ -601,7 +606,23 @@
       await sleep(900 + rand(600));
       editor = await findCommentEditor();
     }
-    if (!editor) return "no_editor（滚动4轮+点击评论按钮后仍没输入框）";
+    if (!editor) {
+      // 最后一搏：滚到页面最底部，等懒加载，再找一次并尝试点评论按钮
+      report("最后尝试：滚到页面底部等待评论区懒加载…");
+      showStep("③ 最后尝试：滚到底部…");
+      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+      await sleep(2500 + rand(1500));
+      editor = await findCommentEditor();
+      if (!editor) {
+        const icon2 = await findVisibleCommentIcon();
+        if (icon2) { await humanClick(icon2); await sleep(2200 + rand(1000)); editor = await findCommentEditor(); }
+      }
+      if (!editor) {
+        const st = buildDomState();
+        report("DOM事实: " + st);
+        return "no_editor（已滚到底部仍无输入框；" + st + "）";
+      }
+    }
 
     // 3. 点击输入框获得焦点（像人一样先点一下框）
     report("点击评论框获焦...");
@@ -681,28 +702,23 @@
   }
 
   // —— AI 排障：失败时把现场交给 AI 分析原因 + 下一步 ——
-  async function aiDiagnose(reason, title) {
+    async function aiDiagnose(reason, title) {
     try {
-      let dom = "";
-      try {
-        dom = "url=" + location.href.slice(0, 80) +
-          " | title=" + (document.title || "").slice(0, 40) +
-          " | 评论框存在=" + !!document.querySelector('div[contenteditable="true"]') +
-          " | 评论图标存在=" + !!document.querySelector('[data-e2e="comment-icon"]') +
-          " | 发送按钮存在=" + !!document.querySelector('[data-e2e="comment-post"]') +
-          " | video数=" + document.querySelectorAll("video").length +
-          " | captcha=" + ((document.title||"").includes("\u9a8c\u8bc1\u7801") || !!document.querySelector("iframe[src*=verifycenter],iframe[src*=captcha]")) +
-          " | 页面正文前100字=" + (document.body.innerText || "").replace(/\s+/g, " ").slice(0, 100);
-      } catch {}
+      const dom = buildDomState();
+      const capFact = /captcha=true/.test(dom);
       const resp = await chrome.runtime.sendMessage({ action: "llm", prompt:
-        "你是抖音网页自动化助手的排障专家。视频《" + title + "》操作失败。\n" +
+        "抖音网页自动操作失败排障。\n" +
         "失败原因: " + reason + "\n" +
-        "页面状态: " + dom + "\n" +
-        "规则：页面状态里 captcha=false 且正文无'验证'字样时，禁止猜测验证码/风控，必须依据字段(评论框/评论图标/发送按钮存在性)判断。" +
-        "请用一行中文回答：①真实原因 ②建议动作，80字以内。" });
+        "真实字段(以此为准): " + dom + "\n" +
+        "硬规则: captcha=" + capFact + "。captcha=false 时，回答中禁止出现以下词：验证码、滑块、风控、人机验证。" +
+        (capFact ? "captcha=true，可以提验证码并建议手动完成。\n" : "captcha=false，必须从其它事实找原因(ready/viewportBottom/评论元素数/登录态/页面正文)。\n") +
+        "只输出一行中文: ①基于字段的真实原因 ②下一步动作，80字内。" });
       if (resp && resp.error) return "AI排障不可用: " + resp.error;
-      const ans = String(resp.content || "").trim().replace(/^[\s\S]*?(?=[^。\n])/, "").slice(0, 120);
-      return "AI分析: " + (ans || resp.content || "");
+      const ans = String(resp.content || "").trim().replace(/\n/g, " ").slice(0, 140);
+      // 终检：captcha=false 时强行抹掉违规猜测词
+      let out = ans;
+      if (!capFact) out = out.replace(/(验证码|滑块|风控|人机验证)[^，,；;]*/g, "").replace(/，{2,}/g, "，");
+      return "AI分析: " + (out || ans);
     } catch (e) { return "AI排障失败: " + String(e); }
   }
 
