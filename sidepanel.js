@@ -8,7 +8,19 @@ async function getReadyTab() {
   return tab;
 }
 
-const status = (s, bad = false) => { $("status").textContent = s; $("status").style.color = bad ? "#c00" : "#0a7"; };
+const status = (s, bad = false) => {
+  $("status").textContent = s;
+  $("status").style.color = bad ? "#c00" : "#0a7";
+  // 同步进底部执行日志
+  const box = $("logBox");
+  if (box) {
+    const line = document.createElement("div");
+    line.className = bad ? "fail" : "step";
+    line.textContent = "[" + new Date().toLocaleTimeString() + "] " + s;
+    box.appendChild(line);
+    box.scrollTop = box.scrollHeight;
+  }
+};
 
 // ── 配置 ──
 async function loadCfg() {
@@ -195,7 +207,7 @@ loadCfg();
 // ── 全自动模式 ──
 // watch monitor: one live line per step
 function watchLog(text, cls) {
-  const box = $("watchBox");
+  const box = $("logBox") || $("watchBox");
   if (!box) return;
   box.style.display = "block";
   const line = document.createElement("div");

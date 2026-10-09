@@ -50,6 +50,12 @@
   .hist:hover { background:#fff2f4; }
   .hist .t { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .hist .m { color:#aaa; font-size:10px; }
+  #logBox { max-height: 200px; min-height: 60px; overflow-y: auto; background:#14161f; color:#c5fff2;
+    font-family: Consolas, monospace; font-size: 12px; padding: 8px 10px; border-radius: 6px;
+    line-height: 1.6; }
+  #logBox .step { color: #ffd76e; }
+  #logBox .okline { color: #8ef7b7; }
+  #logBox .fail { color: #ff7b72; }
   #watchBox { max-height: 240px; overflow-y: auto; background:#14161f; color:#c5fff2;
     font-family: Consolas, monospace; font-size: 12px; padding: 8px 10px; border-radius: 6px;
     margin: 6px 12px; line-height: 1.55; }
@@ -105,7 +111,8 @@
   <div class="row">
     <input type="text" id="city" placeholder="固定城市，如：杭州" style="width:40%">
     <input type="text" id="kw" placeholder="关键词，回车搜">
-    <button id="btnSearch" class="primary">▶ 开始执行</button>
+  <div class="row" style="margin-top:6px">
+    <button id="btnSearch" class="primary" style="flex:1;height:40px;font-size:15px;font-weight:bold">▶ 开始执行</button>
   </div>
   <div class="row" style="margin-top:4px;align-items:center">
     <span style="font-size:12px;white-space:nowrap">本次最多</span>
@@ -135,6 +142,11 @@
 <div class="sec">
   <div class="lbl">✅ 评论成功的视频（视频名 + 评论内容，实时更新）</div>
   <div id="doneList" style="max-height:240px;overflow-y:auto"></div>
+</div>
+
+<div class="sec">
+  <div class="lbl">📋 执行日志（实时滚动，确认正在运行就看这里）</div>
+  <div id="logBox"></div>
 </div>
 
 <div class="foot">打开列表页 → 点「开始自动」→ 浏览器自动切到视频页，页面右上角实时显示当前步骤（展开评论区 / 逐字打字 / 点击发送），全程像真人操作，你亲眼看着它完成；条数与间隔在上方设置</div>
