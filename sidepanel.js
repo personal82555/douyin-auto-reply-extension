@@ -8,6 +8,33 @@ async function getReadyTab() {
   return tab;
 }
 
+
+// —— 本次执行计时：开始执行时启动，收到完成/中止信号时停止 ——
+let _runTimer = null, _runT0 = 0;
+function fmtElapsed(ms) {
+  const s = Math.floor(ms / 1000);
+  return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+}
+function startRunTimer() {
+  if (_runTimer) clearInterval(_runTimer);
+  _runT0 = Date.now();
+  const el = $("runTimer");
+  if (el) el.textContent = "计时 00:00";
+  _runTimer = setInterval(() => {
+    const el2 = $("runTimer");
+    if (el2) el2.textContent = "计时 " + fmtElapsed(Date.now() - _runT0);
+  }, 1000);
+}
+function stopRunTimer(outcome) {
+  if (!_runTimer) return;
+  clearInterval(_runTimer);
+  _runTimer = null;
+  const el = $("runTimer");
+  const used = fmtElapsed(Date.now() - _runT0);
+  if (el) el.textContent = (outcome || "完成") + " " + used;
+  status("本次执行" + (outcome || "完成") + "，总用时 " + used);
+}
+
 const status = (s, bad = false) => {
   $("status").textContent = s;
   $("status").style.color = bad ? "#c00" : "#0a7";
@@ -153,6 +180,7 @@ $("btnSearch").onclick = async () => {
     if (!tab || !tab.id) throw new Error("拿不到标签页 id");
   } catch (e) { return status("打开抖音失败: " + e.message, true); }
 
+  startRunTimer();
   status("打开搜索页: " + kw + "（浏览器会切到前台）…");
   watchLog("搜索: " + kw, "step");
 
@@ -220,6 +248,8 @@ function watchLog(text, cls) {
 chrome.runtime.onMessage.addListener((m) => {
   if (m.auto === "log") {
     status(m.text);
+    if (/全自动结束|全部完成|已停止|未命中|没抓到视频|弹了验证码|跳过。/.test(m.text))
+      stopRunTimer(/失败|✗|验证码/.test(m.text) ? "中止" : "完成");
     const cls = /OK|\u6210\u529f|\u5b8c\u6210|\u5df2\u53d1\u9001/.test(m.text) ? "okline"
               : /\u5931\u8d25|\u9519\u8bef|\u9a8c\u8bc1\u7801|no_/.test(m.text) ? "fail" : "step";
     watchLog(m.text, cls);
