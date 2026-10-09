@@ -154,6 +154,92 @@
     return FALLBACK_TPL[Math.floor(Math.random() * FALLBACK_TPL.length)];
   }
 
+
+  // —— 增强版AI：结构化动作执行器（L2）——
+  async function execAiAction(act) {
+    if (!act || !act.action) return false;
+    if (act.action === "scroll") {
+      window.scrollBy({ top: act.px || 800, behavior: "smooth" });
+      await sleep(900);
+      return true;
+    }
+    if (act.action === "wait") {
+      await sleep(Math.min(10000, act.ms || 2000));
+      return true;
+    }
+    if (act.action === "click" && act.selector) {
+      let el = null;
+      try { el = document.querySelector(act.selector); } catch {}
+      if (!el && act.text) {
+        el = [...document.querySelectorAll("button,div,span")].find(x =>
+          (x.textContent || "").trim() === act.text && x.getBoundingClientRect().height > 0);
+      }
+      if (!el) return false;
+      await humanClick(el);
+      await sleep(1500);
+      return true;
+    }
+    return false;
+  }
+
+  // —— 增强版AI：失败自愈（视觉截图 → 模型给动作 → 执行 → 重试一次）——
+  async function aiHeal(reason, title) {
+    try {
+      const dom = buildDomState();
+      let img = "";
+      try {
+        const cap = await chrome.runtime.sendMessage({ action: "captureActive" });
+        if (cap && cap.dataUrl) img = cap.dataUrl;
+      } catch {}
+      const prompt =
+        "抖音网页自动评论操作失败，你是操作教练。\n" +
+        "失败原因: " + reason + "\n" +
+        "DOM状态: " + dom + "\n" +
+        (img ? "截图里是当前页面，结合截图判断。\n" : "") +
+        "只输出一个JSON动作，不要解释：{\"action\":\"click|\"scroll|\"wait|\"giveup\",\"selector\":\"可选CSS选择器\",\"text\":\"可选按钮文字\",\"px\":数字,\"ms\":数字,\"reason\":\"一句话\"}";
+      const resp = img
+        ? await chrome.runtime.sendMessage({ action: "llmVision", dataUrl: img, prompt })
+        : await chrome.runtime.sendMessage({ action: "llm", prompt });
+      if (!resp || resp.error) { report("自愈AI不可用: " + (resp && resp.error || "")); return false; }
+      const raw = String(resp.content || "").trim().replace(/^```(json)?\s*|\s*```$/g, "").trim();
+      let act = null;
+      try { act = JSON.parse(raw); } catch {
+        const m = raw.match(/\{[\s\S]*\}/);
+        if (m) { try { act = JSON.parse(m[0]); } catch {} }
+      }
+      if (!act) { report("AI动作解析失败: " + raw.slice(0, 60)); return false; }
+      report("AI动作: " + JSON.stringify(act).slice(0, 120));
+      if (act.action === "giveup") { report("AI建议放弃本条: " + (act.reason || "")); return false; }
+      const done = await execAiAction(act);
+      report(done ? "AI动作已执行 ✓" : "AI动作执行失败");
+      return done;
+    } catch (e) { report("自愈异常: " + String(e)); return false; }
+  }
+
+  function buildDomState() {
+    try {
+      return "url=" + location.href.slice(0, 80) +
+        " | title=" + (document.title || "").slice(0, 40) +
+        " | scrollY=" + Math.round(window.scrollY) + "/" + document.body.scrollHeight +
+        " | 评论框=" + !!document.querySelector('div[contenteditable="true"]') +
+        " | 评论按钮=" + !!document.querySelector('[data-e2e="comment-icon"]') +
+        " | 发送按钮=" + !!document.querySelector('[data-e2e="comment-post"]') +
+        " | captcha=" + ((document.title || "").includes("\u9a8c\u8bc1\u7801") ||
+          !!document.querySelector("iframe[src*=verifycenter],iframe[src*=captcha]")) +
+        " | 正文=" + (document.body.innerText || "").replace(/\s+/g, " ").slice(0, 120);
+    } catch { return "(DOM读取失败)"; }
+  }
+
+  // 热评参考（增强模式：让AI评论更接话）
+  function topComments() {
+    try {
+      const els = [...document.querySelectorAll('[data-e2e=comment-level-1], [class*=comment] p, [class*=comment] span')]
+        .map(e => (e.innerText || "").trim())
+        .filter(t => t.length > 4 && t.length < 50);
+      return [...new Set(els)].slice(0, 3).join(" / ");
+    } catch { return ""; }
+  }
+
   function findCardElement(it) {
     const href = it.href || "";
     const vidId = href.split("/video/")[1];
@@ -195,7 +281,8 @@
     }
     // 关键词自动回复：命中标题的帖子优先，只回匹配的
     let rule = {};
-    try { rule = await chrome.storage.local.get(["kwAutoOn", "autoKeywords", "autoReplyText", "autoImageDataUrl"]); } catch {}
+    try { rule = await chrome.storage.local.get(["kwAutoOn", "autoKeywords", "autoReplyText", "autoImageDataUrl", "enhancedOn", "model", "baseUrl"]); } catch {}
+    const enhanced = !!(rule.enhancedOn && rule.model && rule.baseUrl);   // 增强版AI执行
     const kws = String(rule.autoKeywords || "").split(/\n+/).map(x => x.trim()).filter(x => x.length > 0);
     if (rule.kwAutoOn && kws.length) {
       const matched = items.filter(it => kws.some(k => (it.title || "").includes(k)));
@@ -227,7 +314,8 @@
           title: it.title,
           listUrl: location.href,
           customText: custom,
-          customImg: customImg
+          customImg: customImg,
+          enhanced: enhanced
         }));
         // ① 先像真人一样点击卡片；② 抖音可能校验 isTrusted 忽略合成事件 → 检测是否跳转，没跳就直接导航
         const beforeUrl = location.href;
@@ -272,7 +360,22 @@
       keepVideosPaused(60);   // 60秒内每2秒复查一次，React重渲染也按得住
       showStep("① 视频已暂停，准备评论…");
       if (location.pathname.startsWith("/video/")) {
-        const r = await postOnce(state.gapSec, state);
+        let r = await postOnce(state.gapSec, state);
+        // 增强版AI：失败自动自愈（视觉/文本→动作→执行→重试）
+        if (state.enhanced && r !== "OK" && r !== "OK(enter)" && r !== "STOPPED") {
+          for (let k = 1; k <= 2 && r !== "OK" && r !== "OK(enter)"; k++) {
+            report("AI增强自愈 第" + k + "/2 次，原因: " + r);
+            showStep("🤖 AI增强自愈(" + k + "/2)…");
+            const ok = await aiHeal(r, state.title || "");
+            if (!ok) break;
+            await sleep(1500);
+            r = await postOnce(state.gapSec, state);
+          }
+          if (r === "OK" || r === "OK(enter)") {
+            state.gapSec = Math.min(state.gapSec + 30, 300);   // 智能间隔：自愈成功后放缓
+            report("智能间隔：下一条间隔增至 " + state.gapSec + "s（AI建议更稳）");
+          }
+        }
         if (r === "OK" || r === "OK(enter)") { state.sent++; report(`已发送 ${state.sent} 条`); }
         else if (r === "STOPPED") {
           sessionStorage.removeItem("dyAutoState");
@@ -432,9 +535,11 @@
       report("使用自定义回复文案: " + text.slice(0, 40));
     } else {
       let resp = null;
+      const ctx = state && state.enhanced ? topComments() : "";
       try {
         resp = await chrome.runtime.sendMessage({ action: "llm",
-          prompt: "为抖音视频《" + title + "》写1条15字内仿真人互动评论，只输出JSON数组如[\"文本\"]" });
+          prompt: "为抖音视频《" + title + "》写1条15字内仿真人互动评论，只输出JSON数组如[\"文本\"]" +
+            (ctx ? "。参考已有热评(接话更自然): " + ctx : "") });
       } catch (e) { resp = { error: String(e) }; }
       if (resp && resp.error) {
         // 没配模型/模型不可用 → 本地模板兜底，流程照常
@@ -452,6 +557,21 @@
         }
       }
       report("评论文案: " + text);
+      // 增强模式：发送前AI审核（像真人？违规？）
+      if (state && state.enhanced) {
+        try {
+          const chk = await chrome.runtime.sendMessage({ action: "llm",
+            prompt: "审核这句抖音评论，判断是否像真人随口说的且无违规(广告/联系方式/联系方式谐音/敏感词)。只输出JSON: {\"ok\":true/false,\"suggest\":\"若ok=false给一句更好的替换(15字内)\"} 内容: " + text });
+          const raw = String(chk && chk.content || "").trim().replace(/^```(json)?\s*|\s*```$/g, "").trim();
+          let c = null; try { c = JSON.parse(raw); } catch { const mm = raw.match(/\{[\s\S]*\}/); if (mm) { try { c = JSON.parse(mm[0]); } catch {} } }
+          if (c && c.ok === false) {
+            if (c.suggest && String(c.suggest).length >= 4 && String(c.suggest).length <= 30) {
+              text = String(c.suggest);
+              report("AI审核通过建议替换 → " + text);
+            } else { report("AI审核: 文案风险，仍按原文发送"); }
+          } else if (c) { report("AI审核: 通过 ✓"); }
+        } catch (e) { report("审核跳过: " + String(e).slice(0, 50)); }
+      }
     }
 
     // ── 仿人流程 ──

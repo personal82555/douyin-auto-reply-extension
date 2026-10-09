@@ -256,6 +256,47 @@ if (imgInput) imgInput.addEventListener("change", async () => {
   autoSaveRule({ autoImageDataUrl: dataUrl });
 });
 
+
+// —— 增强版AI执行：有模型才能开 ——
+function refreshEnhanced() {
+  const en = $("enhancedOn"), hint = $("enhHint");
+  if (!en) return;
+  const hasModel = !!($("model").value.trim() && $("baseUrl").value.trim());
+  en.disabled = !hasModel;
+  if (!hasModel) { en.checked = false; hint.style.display = "inline"; }
+  else { hint.style.display = "none"; }
+}
+async function loadEnhanced() {
+  const c = await chrome.storage.local.get("enhancedOn");
+  const en = $("enhancedOn");
+  if (en && c.enhancedOn) en.checked = true;
+  refreshEnhanced();
+}
+if ($("enhancedOn")) $("enhancedOn").addEventListener("change", () => {
+  chrome.storage.local.set({ enhancedOn: $("enhancedOn").checked });
+});
+["model", "baseUrl"].forEach(id => {
+  const el = $(id);
+  if (el) el.addEventListener("input", refreshEnhanced);
+});
+loadEnhanced();
+
+// —— AI 日报 ——
+if ($("btnDailyReport")) $("btnDailyReport").onclick = async () => {
+  status("AI日报生成中…");
+  try {
+    const { list } = await chrome.runtime.sendMessage({ action: "getHistory" });
+    const today = (list || []).filter(r => new Date(r.ts).toDateString() === new Date().toDateString());
+    if (!today.length) { status("今天还没有评论记录"); return; }
+    const lines = today.map(r => (r.title || "") + " → " + (r.text || "")).slice(0, 30).join("\n");
+    const resp = await chrome.runtime.sendMessage({ action: "llm",
+      prompt: "这是今天自动评论的记录（视频标题 → 评论内容）：\n" + lines +
+        "\n\n请输出3行以内的中文日报：①今日执行概况 ②文案质量一句话 ③明天建议(条数/关键词/风格)，60字以内。" });
+    const out = (resp && !resp.error) ? String(resp.content).trim() : ("模型不可用: " + (resp && resp.error));
+    status("AI日报: " + out);
+  } catch (e) { status("日报失败: " + e.message, true); }
+};
+
 loadCfg();
 
 

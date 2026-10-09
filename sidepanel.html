@@ -79,6 +79,7 @@
     <div class="stat"><div class="n" id="stWeek">0</div><div class="k">周</div></div>
     <div class="stat"><div class="n" id="stToday">0</div><div class="k">今日</div></div>
     <button id="btnClearHist" title="清空记录">清空</button>
+    <button id="btnDailyReport" title="AI总结今天的执行情况" style="font-size:12px">AI日报</button>
   </div>
   <details style="margin-top:6px">
     <summary style="cursor:pointer;font-size:12px">评论过的视频明细</summary>
@@ -95,6 +96,10 @@
     <button id="saveCfg">保存配置</button>
     <button id="testCfg">测试连接</button>
     <span id="testMsg" style="font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+  </div>
+  <div class="row" style="margin-top:6px;flex-wrap:wrap">
+    <label style="font-size:12px"><input type="checkbox" id="enhancedOn" disabled> 🧠 增强版AI执行（视觉识别 / 动作自愈 / 发送审核 / 智能间隔）</label>
+    <span id="enhHint" style="font-size:11px;color:#e67e22">填模型后可开通增强版AI执行</span>
   </div>
 </div>
 
