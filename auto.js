@@ -534,22 +534,30 @@
   }
 
   async function findCommentEditor() {
-    const pool = [
+    // 评论框直接显示在视频页上：多种可能的控件类型都认
+    const sels = [
       'div[data-e2e="comment-input"] div[contenteditable="true"]',
-      'div[data-e2e="comment-input"]',
-      'div[contenteditable="true"]'
+      'div[data-e2e="comment-input"] [contenteditable]',
+      'div[contenteditable="true"]',
+      '[contenteditable="true"]',
+      'textarea[placeholder*="说"]',
+      'textarea[placeholder*="评"]',
+      'input[placeholder*="说点"]',
+      'input[placeholder*="评论"]',
+      'textarea'
     ];
-    for (const sel of pool) {
+    for (const sel of sels) {
       try {
-        const e = document.querySelector(sel);
-        if (e && e.getBoundingClientRect().height > 5) {
-          return /contenteditable/.test(e.getAttribute("contenteditable") || "") ? e
-            : (e.querySelector('div[contenteditable="true"]') || null);
+        const nodes = [...document.querySelectorAll(sel)];
+        for (const n of nodes) {
+          const r = n.getBoundingClientRect();
+          if (r.height > 4 && r.width > 30 && r.top < window.innerHeight && r.bottom > 0) return n;
         }
       } catch {}
     }
     return null;
   }
+
 
   async function postOnce(gapSec, state) {
     const customText = (state && state.customText) || "";
@@ -611,27 +619,28 @@
     showStep("② 观看视频 3~6 秒…");
     await sleep(3000 + rand(0, 3000));
 
-    // 2. 像真人一样：往下滚找评论框（评论区在页面下方），找不到就点评论按钮，最多4轮
+    // 2. 评论框在视频页直接显示 → 先直接找，找到就点入（真人就是这样）
     let editor = await findCommentEditor();
-    for (let round = 1; round <= 4 && !editor; round++) {
-      report("第" + round + "轮：向下滚动找评论框…");
-      showStep("③ 向下滚动找评论区(" + round + "/4)…");
-      await humanScrollDown(window.innerHeight * (round === 1 ? 0.8 : 1.2));
-      await sleep(700 + rand(500));
+    if (editor) {
+      report("已直接定位到评论框 ✓（无需点评论按钮）");
+      showStep("③ 找到评论框，点击输入…");
+    } else {
+      // 直接没有 → 轻滚一屏找找（懒加载场景）
+      showStep("③ 找评论框（轻滚动）…");
+      await humanScrollDown(window.innerHeight * 0.5, 4);
+      await sleep(800 + rand(500));
       editor = await findCommentEditor();
-      if (editor) break;
+    }
+    if (!editor) {
+      // 还没有 → 兜底：点评论按钮展开（个别布局）
       const icon = await findVisibleCommentIcon();
       if (icon) {
-        report("发现评论按钮，点击展开…");
-        showStep("③ 点击评论按钮展开…");
+        report("直接没找到，兜底点评论按钮…");
+        showStep("③ 兜底：点击评论按钮…");
         await humanClick(icon);
         await sleep(2200 + rand(1500));
         editor = await findCommentEditor();
-        if (editor) break;
       }
-      window.scrollBy({ top: window.innerHeight, behavior: "smooth" });
-      await sleep(900 + rand(600));
-      editor = await findCommentEditor();
     }
     if (!editor) {
       // 最后一搏：滚到页面最底部，等懒加载，再找一次并尝试点评论按钮
@@ -651,14 +660,13 @@
       }
     }
 
-    // 3. 点击输入框获得焦点（像人一样先点一下框）
+    // 3. 点击评论框获得焦点（像真人一样先点一下框）
     report("点击评论框获焦...");
     showStep("④ 点击评论框…");
     await humanClick(editor);
     await sleep(600 + rand(0, 600));
-    // 确保焦点在框内
-    const inner = (editor.getAttribute("contenteditable") === "true") ? editor
-      : (editor.querySelector('div[contenteditable="true"]') || editor);
+    const inner = (editor.getAttribute && editor.getAttribute("contenteditable") === "true") ? editor
+      : (editor.querySelector && editor.querySelector('div[contenteditable="true"]') || editor);
     inner.focus();
 
     // 3.5 附图（若配置了图片）
@@ -686,11 +694,18 @@
     // 4. 逐字输入（模拟打字节奏 60~180ms/字，带偶发停顿）
     report("逐字输入评论...");
     showStep("⑤ 逐字输入中: " + text.slice(0, 20));
+    const isCE = (inner.getAttribute && inner.getAttribute("contenteditable") === "true");
+    const isField = (inner.tagName === "TEXTAREA" || inner.tagName === "INPUT");
     for (const ch of text) {
-      document.execCommand("insertText", false, ch);
+      if (isCE) document.execCommand("insertText", false, ch);
+      else if (isField) {
+        inner.value = (inner.value || "") + ch;
+        inner.dispatchEvent(new Event("input", { bubbles: true }));
+      } else break;
       await sleep(50 + Math.random() * 110);
       if (Math.random() < 0.08) await sleep(200 + Math.random() * 300);
     }
+    if (!isCE && !isField) return "editor_not_typeable（评论框类型不支持输入）";
     await sleep(600 + rand(0, 800));
     if (isCaptchaNow()) return "\u8f93\u5165\u540e\u5f39\u9a8c\u8bc1\u7801\uff0c\u672a\u53d1\u9001";
 
