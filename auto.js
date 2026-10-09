@@ -64,6 +64,7 @@
       runAuto(msg.maxN, msg.gapSec, msg.promptExtra || "");
       return true;
     }
+    if (msg.action === "testVerify") { alertVerify("这是测试弹层：真实检测到验证时就会这样弹出来"); sendResponse({ ok: true }); return true; }
     if (msg.action === "autoStop") { window.__dyAutoStop = true; sessionStorage.setItem("__dyStop", "1"); sendResponse({ stopping: true }); return true; }
     if (msg.action === "grabItems") { sendResponse({ items: grabItems() }); return true; }
   });
@@ -271,8 +272,14 @@
 
 
   function captchaShown() {
-    return (document.title || "").includes("\u9a8c\u8bc1\u7801") ||
-      !!document.querySelector("iframe[src*=verifycenter], iframe[src*=captcha], div[class*=captcha]");
+    try {
+      if ((document.title || "").includes("\u9a8c\u8bc1\u7801")) return true;
+      if (document.querySelector("iframe[src*=verifycenter], iframe[src*=captcha], iframe[src*=bytedance.com][src*=verify], div[class*=captcha], div[class*=verify]")) return true;
+      const t = document.body ? document.body.innerText : "";
+      // 抖音真实滑块页文案（实测确认）
+      if (/\u8bf7\u5b8c\u6210\u4e0b\u5217\u9a8c\u8bc1/.test(t) || /\u6309\u4f4f[\s\S]{0,10}\u62d6\u52a8/.test(t)) return true;
+    } catch {}
+    return false;
   }
 
   // 页面中央弹大提示：要求用户完成验证；验证消失或点"已验证"后继续

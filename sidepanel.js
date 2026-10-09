@@ -294,6 +294,17 @@ if ($("btnDailyReport")) $("btnDailyReport").onclick = async () => {
   } catch (e) { status("日报失败: " + e.message, true); }
 };
 
+
+// —— 测试验证弹层（证明弹层可用） ——
+if ($("btnTestVerify")) $("btnTestVerify").onclick = async () => {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab || !/douyin\.com/.test(tab.url || "")) { status("请先切到抖音标签页再点测试", true); return; }
+    await chrome.tabs.sendMessage(tab.id, { action: "testVerify" });
+    status("已在抖音页弹出测试提示（在页面中央找红色弹层）");
+  } catch (e) { status("测试失败: " + e.message, true); }
+};
+
 loadCfg();
 
 
