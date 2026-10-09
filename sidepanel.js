@@ -332,7 +332,38 @@ $("btnClearHist").onclick = async () => {
   await chrome.runtime.sendMessage({ action: "clearHistory" });
   refreshStats(); refreshHistory();
 };
+
+// ✅ 实时展示评论成功的视频（视频名+内容），新记录到达即刷新
+async function renderDone() {
+  const box = $("doneList");
+  if (!box) return;
+  try {
+    const { list } = await chrome.runtime.sendMessage({ action: "getHistory" });
+    box.innerHTML = "";
+    const recent = (list || []).slice(0, 20);
+    if (!recent.length) {
+      const e = document.createElement("div");
+      e.style.cssText = "color:#aaa;font-size:12px;padding:6px 12px";
+      e.textContent = "还没有评论成功的记录，运行一次试试";
+      box.appendChild(e);
+      return;
+    }
+    recent.forEach(r => {
+      const d = document.createElement("div");
+      d.className = "done";
+      d.innerHTML = '<div class="dt"></div><div class="dc"></div><div class="dm"></div>';
+      d.querySelector(".dt").textContent = r.title || r.url || "(未知视频)";
+      d.querySelector(".dc").textContent = "评论: " + (r.text || "");
+      d.querySelector(".dm").textContent = new Date(r.ts).toLocaleString();
+      d.title = "点击打开该视频";
+      d.onclick = () => chrome.tabs.create({ url: r.url });
+      box.appendChild(d);
+    });
+  } catch {}
+}
+renderDone();
+
 chrome.runtime.onMessage.addListener((m) => {
-  if (m.histUpdated) { refreshStats(); refreshHistory(); }
+  if (m.histUpdated) { refreshStats(); refreshHistory(); renderDone(); }
 });
 refreshStats(); refreshHistory();
