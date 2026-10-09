@@ -113,6 +113,15 @@
     }, 2000);
   }
 
+  async function humanScrollDown(px, steps) {
+    steps = steps || 6;
+    const per = Math.max(60, Math.round(px / steps));
+    for (let i = 0; i < steps; i++) {
+      window.scrollBy({ top: per, behavior: "smooth" });
+      await sleep(140 + Math.random() * 220);
+    }
+  }
+
   function findCardElement(it) {
     const href = it.href || "";
     const vidId = href.split("/video/")[1];
@@ -393,18 +402,29 @@
     showStep("② 观看视频 3~6 秒…");
     await sleep(3000 + rand(0, 3000));
 
-    // 2. 点开评论区：人手动作点右下/右侧的评论icon
+    // 2. 像真人一样：往下滚找评论框（评论区在页面下方），找不到就点评论按钮，最多4轮
     let editor = await findCommentEditor();
-    if (!editor) {
+    for (let round = 1; round <= 4 && !editor; round++) {
+      report("第" + round + "轮：向下滚动找评论框…");
+      showStep("③ 向下滚动找评论区(" + round + "/4)…");
+      await humanScrollDown(window.innerHeight * (round === 1 ? 0.8 : 1.2));
+      await sleep(700 + rand(500));
+      editor = await findCommentEditor();
+      if (editor) break;
       const icon = await findVisibleCommentIcon();
-      if (!icon) return "no_comment_icon（找不到评论按钮）";
-      report("点击评论按钮展开评论区...");
-      showStep("③ 像真人一样点开评论区…");
-      await humanClick(icon);
-      await sleep(2500 + rand(0, 1500));
+      if (icon) {
+        report("发现评论按钮，点击展开…");
+        showStep("③ 点击评论按钮展开…");
+        await humanClick(icon);
+        await sleep(2200 + rand(1500));
+        editor = await findCommentEditor();
+        if (editor) break;
+      }
+      window.scrollBy({ top: window.innerHeight, behavior: "smooth" });
+      await sleep(900 + rand(600));
       editor = await findCommentEditor();
     }
-    if (!editor) return "no_editor（点开评论区了还是没输入框，可能弹验证码）";
+    if (!editor) return "no_editor（滚动4轮+点击评论按钮后仍没输入框）";
 
     // 3. 点击输入框获得焦点（像人一样先点一下框）
     report("点击评论框获焦...");
@@ -492,13 +512,15 @@
           " | 评论图标存在=" + !!document.querySelector('[data-e2e="comment-icon"]') +
           " | 发送按钮存在=" + !!document.querySelector('[data-e2e="comment-post"]') +
           " | video数=" + document.querySelectorAll("video").length +
+          " | captcha=" + ((document.title||"").includes("\u9a8c\u8bc1\u7801") || !!document.querySelector("iframe[src*=verifycenter],iframe[src*=captcha]")) +
           " | 页面正文前100字=" + (document.body.innerText || "").replace(/\s+/g, " ").slice(0, 100);
       } catch {}
       const resp = await chrome.runtime.sendMessage({ action: "llm", prompt:
         "你是抖音网页自动化助手的排障专家。视频《" + title + "》操作失败。\n" +
         "失败原因: " + reason + "\n" +
         "页面状态: " + dom + "\n" +
-        "请用一行中文回答：①可能的真实原因 ②建议的下一步动作（如手动做什么/代码该改什么），80字以内，直接输出。" });
+        "规则：页面状态里 captcha=false 且正文无'验证'字样时，禁止猜测验证码/风控，必须依据字段(评论框/评论图标/发送按钮存在性)判断。" +
+        "请用一行中文回答：①真实原因 ②建议动作，80字以内。" });
       if (resp && resp.error) return "AI排障不可用: " + resp.error;
       const ans = String(resp.content || "").trim().replace(/^[\s\S]*?(?=[^。\n])/, "").slice(0, 120);
       return "AI分析: " + (ans || resp.content || "");
