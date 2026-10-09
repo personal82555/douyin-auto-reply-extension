@@ -68,13 +68,19 @@ $("saveCfg").onclick = async () => {
   status("配置已保存 ✓");
 };
 $("testCfg").onclick = async () => {
-  status("测试中...");
+  const m = $("testMsg");
+  const set = (t, ok) => { m.textContent = t; m.style.color = ok ? "#0a7" : "#c00"; };
+  set("测试中…", true);
   try {
     const text = await llmChat([
-      { role: "user", content: "只输出JSON数组：[\"好的\"]" }
+      { role: "user", content: "只输出JSON数组：[好的]" }
     ], 50);
-    status("连接成功 ✓ 返回: " + text.slice(0, 60));
-  } catch (e) { status("失败: " + e.message, true); }
+    set("✓ 成功: " + String(text).slice(0, 40), true);
+    status("LLM连接成功");
+  } catch (e) {
+    set("✗ 失败: " + String(e.message).slice(0, 60), false);
+    status("测试失败: " + e.message, true);
+  }
 };
 
 // ── LLM 调用（popup 内直接 fetch，无跨域限制因为声明了 host_permissions）──
