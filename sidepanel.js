@@ -9,6 +9,21 @@ async function getReadyTab() {
 }
 
 
+let _autoTabId = null;
+// —— 停止执行 ——
+$("btnStopRun").onclick = async () => {
+  status("正在停止…");
+  try {
+    if (_autoTabId != null) await chrome.tabs.sendMessage(_autoTabId, { action: "autoStop" });
+    const tabs = await chrome.tabs.query({ url: "*://www.douyin.com/*" });
+    for (const t of tabs) { try { await chrome.tabs.sendMessage(t.id, { action: "autoStop" }); } catch {} }
+  } catch {}
+  const sb2 = $("btnStopRun"); if (sb2) sb2.style.display = "none";
+  const bs = $("btnSearch"); if (bs) bs.style.display = "inline-block";
+  _autoTabId = null;
+  stopRunTimer("已停止");
+};
+
 // —— 本次执行计时：开始执行时启动，收到完成/中止信号时停止 ——
 let _runTimer = null, _runT0 = 0;
 function fmtElapsed(ms) {

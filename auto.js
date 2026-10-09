@@ -122,6 +122,20 @@
     }
   }
 
+
+  function stopRequested() {
+    return window.__dyAutoStop || sessionStorage.getItem("__dyStop");
+  }
+  // 可被打断的等待：停止标志出现立即返回 false
+  async function stopSleep(ms) {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) {
+      if (stopRequested()) return false;
+      await sleep(Math.min(500, ms - (Date.now() - t0)));
+    }
+    return !stopRequested();
+  }
+
   function findCardElement(it) {
     const href = it.href || "";
     const vidId = href.split("/video/")[1];
@@ -242,6 +256,13 @@
       if (location.pathname.startsWith("/video/")) {
         const r = await postOnce(state.gapSec, state);
         if (r === "OK" || r === "OK(enter)") { state.sent++; report(`已发送 ${state.sent} 条`); }
+        else if (r === "STOPPED") {
+          sessionStorage.removeItem("dyAutoState");
+          sessionStorage.removeItem("__dyStop");
+          report("已停止（未发送当前条）");
+          showStep("⏹ 已停止", "ok");
+          return;
+        }
         else {
           report("未成功: " + r);
           showStep("✗ 未发送: " + String(r).slice(0, 40), "fail");
@@ -251,8 +272,15 @@
         }
         // 等待间隔
         const wait = Math.max(15, state.gapSec + Math.floor(rand(-10, 30)));
-        report(`休眠 ${wait}s 后继续`);
-        await sleep(wait * 1000);
+        report(`休眠 ${wait}s 后继续（点停止可立刻中断）`);
+        const alive = await stopSleep(wait * 1000);
+        if (!alive || stopRequested()) {
+          sessionStorage.removeItem("dyAutoState");
+          sessionStorage.removeItem("__dyStop");
+          report("已停止（休眠被中断）");
+          showStep("⏹ 已停止", "ok");
+          return;
+        }
         const stopped = window.__dyAutoStop || sessionStorage.getItem("__dyStop");
         if (stopped) {
           sessionStorage.removeItem("__dyStop");
@@ -457,6 +485,7 @@
       } catch (e) { report("附图失败(不影响文字): " + String(e)); }
     }
 
+    if (stopRequested()) return "STOPPED";
     // 4. 逐字输入（模拟打字节奏 60~180ms/字，带偶发停顿）
     report("逐字输入评论...");
     showStep("⑤ 逐字输入中: " + text.slice(0, 20));
@@ -487,6 +516,7 @@
       await record(title, text);
       return "OK(enter)";
     }
+    if (stopRequested()) return "STOPPED";
     report("点击发送...");
     showStep("⑥ 点击发送…");
     await humanClick(sb);
