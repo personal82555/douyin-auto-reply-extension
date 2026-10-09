@@ -251,6 +251,10 @@
   const MAX_FAILS = 5;
   function resetFails() { _consecFails = 0; }
   async function bumpFails(reason) {
+    if (/\u9700\u8981\u624b\u52a8\u9a8c\u8bc1/.test(String(reason))) {   // 需要手动验证：不计熔断，等用户
+      report("等待用户完成验证（不计入失败次数）");
+      return false;
+    }
     _consecFails++;
     report("第 " + _consecFails + "/" + MAX_FAILS + " 次连续失败: " + String(reason).slice(0, 80));
     if (_consecFails >= MAX_FAILS) {
@@ -263,6 +267,42 @@
       return true;
     }
     return false;
+  }
+
+
+  function captchaShown() {
+    return (document.title || "").includes("\u9a8c\u8bc1\u7801") ||
+      !!document.querySelector("iframe[src*=verifycenter], iframe[src*=captcha], div[class*=captcha]");
+  }
+
+  // 页面中央弹大提示：要求用户完成验证；验证消失或点"已验证"后继续
+  function alertVerify(reason) {
+    return new Promise(res => {
+      if (document.getElementById("__dyVerifyBox")) { res(false); return; }
+      const box = document.createElement("div");
+      box.id = "__dyVerifyBox";
+      box.style.cssText = "position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);" +
+        "z-index:2147483647;background:#fff;border:3px solid #fe2c55;border-radius:12px;" +
+        "padding:18px 22px;max-width:420px;text-align:center;font:14px/1.7 'Microsoft YaHei',sans-serif;" +
+        "box-shadow:0 8px 40px rgba(0,0,0,.4);color:#222";
+      box.innerHTML = "<div style='font-size:18px;font-weight:bold;color:#fe2c55'>⚠️ 检测到验证/弹窗</div>" +
+        "<div style='margin-top:8px'>" + String(reason || "抖音弹出了验证，请在页面上手动完成").slice(0, 80) + "</div>" +
+        "<div style='margin-top:6px;font-size:12px;color:#888'>完成后插件会自动继续；长时间没弹验证请点下方按钮</div>" +
+        "<button id='__dyVerifyDone' style='margin-top:10px;padding:8px 22px;background:#fe2c55;color:#fff;border:0;border-radius:6px;font-size:14px;cursor:pointer'>已验证，继续执行</button>";
+      document.documentElement.appendChild(box);
+      report("⚠ 需要你手动完成验证（页面中央已弹提示）");
+      showStep("⚠ 请完成页面验证", "fail");
+      const done = (viaPoll) => {
+        if (box.parentNode) box.parentNode.removeChild(box);
+        clearInterval(iv);
+        clearTimeout(to);
+        report(viaPoll ? "验证已消失，自动继续 ✓" : "收到继续指令，继续执行 ✓");
+        res(true);
+      };
+      const iv = setInterval(() => { if (!captchaShown()) done(true); }, 1200);
+      const to = setTimeout(() => { report("等待验证超时5分钟，停止"); done(false); }, 300000);
+      box.querySelector("#__dyVerifyDone").onclick = () => done(false);
+    });
   }
 
   function findCardElement(it) {
@@ -615,6 +655,11 @@
     }
 
     // ── 仿人流程 ──
+    if (captchaShown()) {
+      const okv = await alertVerify("页面加载后检测到验证弹窗");
+      if (!okv) return "需要手动验证(等待超时)";
+      if (stopRequested()) return "STOPPED";
+    }
     // 1. 模拟看完视频再操作（等3~6s）
     showStep("② 观看视频 3~6 秒…");
     await sleep(3000 + rand(0, 3000));
@@ -691,6 +736,11 @@
     }
 
     if (stopRequested()) return "STOPPED";
+    if (captchaShown()) {
+      const okv = await alertVerify("输入前检测到验证弹窗");
+      if (!okv) return "需要手动验证(等待超时)";
+      if (stopRequested()) return "STOPPED";
+    }
     // 4. 逐字输入（模拟打字节奏 60~180ms/字，带偶发停顿）
     report("逐字输入评论...");
     showStep("⑤ 逐字输入中: " + text.slice(0, 20));
@@ -709,30 +759,42 @@
     await sleep(600 + rand(0, 800));
     if (isCaptchaNow()) return "\u8f93\u5165\u540e\u5f39\u9a8c\u8bc1\u7801\uff0c\u672a\u53d1\u9001";
 
-    // 5. 找发送/发布按钮
-    const submitPool = [
-      ...document.querySelectorAll('[data-e2e="comment-post"], [data-e2e="comment-submit"]'),
-      ...(document.querySelector("div[data-e2e=comment-input]")?.parentElement?.querySelectorAll("button") || [])
-    ];
-    let sb = submitPool.find(b => b.getBoundingClientRect().height > 0) || null;
-    if (!sb) {
-      sb = [...document.querySelectorAll("button,div")].find(b =>
-        ["发送", "发布", "提交"].includes((b.textContent || "").trim()) &&
-        b.getBoundingClientRect().height > 0);
-    }
-    if (!sb) {
-      // 没按钮时抖音通常回车即发（同真人行为）
-      inner.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter",
-        keyCode: 13, which: 13, bubbles: true, cancelable: true }));
-      await sleep(1500);
-      await record(title, text);
-      return "OK(enter)";
-    }
+    // 5. 回车提交（抖音输入完回车即发，同真人）
     if (stopRequested()) return "STOPPED";
-    report("点击发送...");
-    showStep("⑥ 点击发送…");
-    await humanClick(sb);
-    await sleep(1500);
+    if (captchaShown()) {
+      const ok = await alertVerify("提交前检测到验证弹窗");
+      if (!ok) return "需要手动验证(等待超时)";
+      if (stopRequested()) return "STOPPED";
+    }
+    report("回车提交评论...");
+    showStep("⑥ 回车提交…");
+    const enterEv = (type) => inner.dispatchEvent(new KeyboardEvent(type,
+      { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true }));
+    inner.focus();
+    enterEv("keydown"); enterEv("keypress");
+    await sleep(60 + Math.random() * 80);
+    enterEv("keyup");
+    await sleep(1800);
+    // 回车后框没清空 → 找发送按钮兜底
+    let stillHas = false;
+    try {
+      if (inner.tagName === "TEXTAREA" || inner.tagName === "INPUT") stillHas = (inner.value || "").trim().length > 0;
+      else stillHas = (inner.innerText || inner.textContent || "").trim().length > 0;
+    } catch {}
+    if (stillHas) {
+      report("回车未提交，找发送按钮兜底…");
+      showStep("⑥ 回车没提交，点发送按钮…");
+      let sb = [...document.querySelectorAll('[data-e2e="comment-post"], [data-e2e="comment-submit"]')]
+        .find(b => b.getBoundingClientRect().height > 0) || null;
+      if (!sb) {
+        sb = [...document.querySelectorAll("button,div")].find(b =>
+          ["发送", "发布", "提交"].includes((b.textContent || "").trim()) &&
+          b.getBoundingClientRect().height > 0);
+      }
+      if (!sb) return "submit_failed（回车没提交也没找到发送按钮）";
+      await humanClick(sb);
+      await sleep(1500);
+    }
     await record(title, text);
     showStep("✓ 评论已发送：" + text.slice(0, 20), "ok");
     return "OK";
