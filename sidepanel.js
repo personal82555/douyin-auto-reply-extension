@@ -76,10 +76,8 @@ $("testCfg").onclick = async () => {
       { role: "user", content: "只输出JSON数组：[好的]" }
     ], 50);
     set("✓ 成功: " + String(text).slice(0, 40), true);
-    status("LLM连接成功");
   } catch (e) {
     set("✗ 失败: " + String(e.message).slice(0, 60), false);
-    status("测试失败: " + e.message, true);
   }
 };
 
