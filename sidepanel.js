@@ -181,10 +181,7 @@ $("btnSearch").onclick = async () => {
   const maxN = Math.max(1, Math.min(20, parseInt($("maxN").value) || 3));
   const gapSec = Math.max(15, Math.min(3600, parseInt($("gapSec").value) || 90));
   saveAutoCounts();
-  if (!$("kwAutoOn").checked && !confirm(
-      "将在搜索结果页自动逐个点开视频并发送评论（最多 " + maxN + " 条 / 间隔 " + gapSec + " 秒）。\n确认开始？"))
-    return;
-  status("等待搜索页加载（8秒）…");
+  status("等待搜索页加载（8秒）…，运行中可点「⏹ 停止」中断");
   await new Promise(r => setTimeout(r, 8000));
   try {
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["auto.js"] });
