@@ -276,36 +276,7 @@ document.querySelector(".promo a").addEventListener("click", async (e) => {
 
 
 // ── 今天前10热门 ──
-async function loadHot() {
-  const box = $("hotList");
-  if (!box) return;
-  box.innerHTML = '<div style="color:#aaa;font-size:12px;padding:0 12px 6px">加载中…</div>';
-  try {
-    const r = await chrome.runtime.sendMessage({ action: "fetchHot" });
-    if (!r.ok) throw new Error(r.error);
-    box.innerHTML = "";
-    r.items.forEach(it => {
-      const d = document.createElement("div");
-      d.className = "item hotitem";
-      const rank = document.createElement("span"); rank.className = "hot"; rank.textContent = it.rank;
-      const t = document.createElement("span"); t.className = "t"; t.textContent = it.word; t.title = it.word + "  热度:" + it.hotValue;
-      const go = document.createElement("span"); go.className = "hot"; go.textContent = "跳转→"; go.style.cursor = "pointer";
-      d.appendChild(rank); d.appendChild(t); d.appendChild(go);
-      d.onclick = () => chrome.tabs.create({ url: it.url });
-      box.appendChild(d);
-    });
-  } catch (e) {
-    box.innerHTML = "";
-    const err = document.createElement("div");
-    err.style.cssText = "color:#c00;font-size:12px;padding:0 12px 6px";
-    err.textContent = "热榜加载失败: " + e.message;
-    box.appendChild(err);
-  }
-}
-loadHot();
-setInterval(loadHot, 10 * 60 * 1000);  // 每10分钟自动刷新
 
-$("btnHotRefresh").onclick = loadHot;
 
 // ---- 我的评论统计 & 明细 ----
 async function refreshStats() {
