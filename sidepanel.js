@@ -174,6 +174,9 @@ $("btnSearch").onclick = async () => {
   try {
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["auto.js"] });
     await chrome.tabs.sendMessage(tab.id, { action: "autoRun", maxN, gapSec });
+    _autoTabId = tab.id;
+    const sb2 = $("btnStopRun"); if (sb2) sb2.style.display = "inline-block";
+    $("btnSearch").style.display = "none";
     status("已启动，浏览器里右上角会显示每一步");
   } catch (e) {
     status("启动失败: " + e.message + "（页面可能还在加载，稍后点⚡开始自动）", true);
@@ -257,8 +260,12 @@ function watchLog(text, cls) {
 chrome.runtime.onMessage.addListener((m) => {
   if (m.auto === "log") {
     status(m.text);
-    if (/全自动结束|全部完成|已停止|未命中|没抓到视频|弹了验证码|跳过。/.test(m.text))
+    if (/全自动结束|全部完成|已停止|未命中|没抓到视频|弹了验证码|跳过。/.test(m.text)) {
       stopRunTimer(/失败|✗|验证码/.test(m.text) ? "中止" : "完成");
+      const sb2 = $("btnStopRun"); if (sb2) sb2.style.display = "none";
+      $("btnSearch").style.display = "inline-block";
+      _autoTabId = null;
+    }
     const cls = /OK|\u6210\u529f|\u5b8c\u6210|\u5df2\u53d1\u9001/.test(m.text) ? "okline"
               : /\u5931\u8d25|\u9519\u8bef|\u9a8c\u8bc1\u7801|no_/.test(m.text) ? "fail" : "step";
     watchLog(m.text, cls);

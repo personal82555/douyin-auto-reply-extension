@@ -64,7 +64,7 @@
       runAuto(msg.maxN, msg.gapSec, msg.promptExtra || "");
       return true;
     }
-    if (msg.action === "autoStop") { window.__dyAutoStop = true; sendResponse({ stopping: true }); return true; }
+    if (msg.action === "autoStop") { window.__dyAutoStop = true; sessionStorage.setItem("__dyStop", "1"); sendResponse({ stopping: true }); return true; }
     if (msg.action === "grabItems") { sendResponse({ items: grabItems() }); return true; }
   });
 
@@ -136,6 +136,7 @@
 
   async function runAuto(maxN, gapSec, promptExtra) {
     window.__dyAutoStop = false;
+    sessionStorage.removeItem("__dyStop");   // 新一轮开始，清掉上次停止标志
     // 只评论"当前页面"上抓到的视频（你正在看的搜索结果/视频列表）
     let items = grabItems();
     if (!Array.isArray(items)) items = [];
@@ -215,6 +216,13 @@
       if (!state || state.navigated) return;
       state.navigated = true;
       sessionStorage.removeItem("dyAutoState");
+      if (sessionStorage.getItem("__dyStop")) {
+        sessionStorage.removeItem("__dyStop");
+        sessionStorage.removeItem("dyAutoState");
+        report("已停止（视频页跳过）");
+        showStep("⏹ 已停止", "ok");
+        return;
+      }
       report(`进入视频页: ${state.title}，等页面稳定...`);
       showStep("① 页面加载中，暂停视频防止自动切下一条…");
       await sleep(3500);
@@ -236,7 +244,13 @@
         const wait = Math.max(15, state.gapSec + Math.floor(rand(-10, 30)));
         report(`休眠 ${wait}s 后继续`);
         await sleep(wait * 1000);
-        if (state.remaining - state.sent > 0 && !window.__dyAutoStop) {
+        const stopped = window.__dyAutoStop || sessionStorage.getItem("__dyStop");
+        if (stopped) {
+          sessionStorage.removeItem("__dyStop");
+          sessionStorage.removeItem("dyAutoState");
+          report("已停止，不再继续");
+          showStep("⏹ 已停止", "ok");
+        } else if (state.remaining - state.sent > 0 && !window.__dyAutoStop) {
           // 回到记录的来源列表页继续下一条
           report("返回列表页继续下一条");
           sessionStorage.setItem("dyAutoResume", JSON.stringify({
@@ -252,7 +266,11 @@
 
   // 回到列表页时自动恢复循环（若还有剩余配额）
   const resume = sessionStorage.getItem("dyAutoResume");
-  if (resume && !location.pathname.startsWith("/video/")) {
+  if (sessionStorage.getItem("__dyStop")) {
+    sessionStorage.removeItem("__dyStop");
+    sessionStorage.removeItem("dyAutoResume");
+    report("已停止，不再回到列表继续");
+  } else if (resume && !location.pathname.startsWith("/video/")) {
     sessionStorage.removeItem("dyAutoResume");
     const st2 = JSON.parse(resume);
     (async () => {
