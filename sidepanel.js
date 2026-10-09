@@ -316,10 +316,10 @@ function watchLog(text, cls) {
 chrome.runtime.onMessage.addListener((m) => {
   if (m.auto === "log") {
     status(m.text);
-    if (/全自动结束|全部完成|已停止|未命中|没抓到视频|弹了验证码|跳过。/.test(m.text)) {
+    if (/全自动结束|全部完成|已停止|未命中|没抓到视频|弹了验证码|跳过。|自动停止/.test(m.text)) {
       stopRunTimer(/失败|✗|验证码/.test(m.text) ? "中止" : "完成");
       const sb2 = $("btnStopRun"); if (sb2) sb2.style.display = "none";
-      $("btnSearch").style.display = "inline-block";
+      const bs = $("btnSearch"); if (bs) bs.style.display = "inline-block";
       _autoTabId = null;
     }
     const cls = /OK|\u6210\u529f|\u5b8c\u6210|\u5df2\u53d1\u9001/.test(m.text) ? "okline"

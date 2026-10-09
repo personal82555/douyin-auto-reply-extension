@@ -245,6 +245,26 @@
     } catch { return ""; }
   }
 
+
+  // —— 连续失败熔断：连续5次失败自动停止（没有成功的失败没有意义）——
+  let _consecFails = 0;
+  const MAX_FAILS = 5;
+  function resetFails() { _consecFails = 0; }
+  async function bumpFails(reason) {
+    _consecFails++;
+    report("第 " + _consecFails + "/" + MAX_FAILS + " 次连续失败: " + String(reason).slice(0, 80));
+    if (_consecFails >= MAX_FAILS) {
+      window.__dyAutoStop = true;
+      sessionStorage.setItem("__dyStop", "1");
+      sessionStorage.removeItem("dyAutoState");
+      sessionStorage.removeItem("dyAutoResume");
+      report("连续失败" + MAX_FAILS + "次，已自动停止执行");
+      showStep("⏹ 连续失败5次，自动停止", "fail");
+      return true;
+    }
+    return false;
+  }
+
   function findCardElement(it) {
     const href = it.href || "";
     const vidId = href.split("/video/")[1];
@@ -336,6 +356,8 @@
         report("单条失败: " + String(e));
         const diag2 = await aiDiagnose(String(e), it.title || "");
         report(diag2);
+        const stopNow = await bumpFails(e);
+        if (stopNow) break;
         await sleep(3000);
       }
     }
@@ -365,7 +387,9 @@
       keepVideosPaused(60);   // 60秒内每2秒复查一次，React重渲染也按得住
       showStep("① 视频已暂停，准备评论…");
       if (location.pathname.startsWith("/video/")) {
-        let r = await postOnce(state.gapSec, state);
+        let r;
+        try { r = await postOnce(state.gapSec, state); }
+        catch (ex) { r = "连接/执行异常: " + String(ex).slice(0, 60); }
         // 增强版AI：失败自动自愈（视觉/文本→动作→执行→重试）
         if (state.enhanced && r !== "OK" && r !== "OK(enter)" && r !== "STOPPED") {
           for (let k = 1; k <= 2 && r !== "OK" && r !== "OK(enter)"; k++) {
@@ -377,11 +401,12 @@
             r = await postOnce(state.gapSec, state);
           }
           if (r === "OK" || r === "OK(enter)") {
+            resetFails();
             state.gapSec = Math.min(state.gapSec + 30, 300);   // 智能间隔：自愈成功后放缓
             report("智能间隔：下一条间隔增至 " + state.gapSec + "s（AI建议更稳）");
           }
         }
-        if (r === "OK" || r === "OK(enter)") { state.sent++; report(`已发送 ${state.sent} 条`); }
+        if (r === "OK" || r === "OK(enter)") { state.sent++; resetFails(); report(`已发送 ${state.sent} 条`); }
         else if (r === "STOPPED") {
           sessionStorage.removeItem("dyAutoState");
           sessionStorage.removeItem("__dyStop");
