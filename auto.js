@@ -136,6 +136,24 @@
     return !stopRequested();
   }
 
+
+  // —— 本地文案模板（没配模型时也能跑）——
+  const FALLBACK_TPL = [
+    "看着不错，收藏了", "这个得点赞", "说得好，支持一下", "学到了学到了",
+    "真实情况就是这样", "有同感，说得对", "路过留个脚印", "这条值得细看",
+    "内容很实在", "看完有点感触", "涨知识了", "期待下一条",
+    "哈哈有点意思", "这是真实经历吧", "实用，先存着"
+  ];
+  function localFallbackText(title) {
+    const t = String(title || "");
+    if (/宽带|网络|装机|资费/.test(t)) return "装之前问清楚有没有合约期，别踩坑";
+    if (/装修|家居|房子|租房/.test(t)) return "这个方案挺实用，参考了";
+    if (/吃|美食|菜|餐|做法/.test(t)  ) return "看着就香，改天试试";
+    if (/车|驾驶|自驾/.test(t)) return "路况熟悉了心里就有底";
+    if (/旅游|景点|攻略/.test(t)) return "收藏了，正好用得上";
+    return FALLBACK_TPL[Math.floor(Math.random() * FALLBACK_TPL.length)];
+  }
+
   function findCardElement(it) {
     const href = it.href || "";
     const vidId = href.split("/video/")[1];
@@ -413,15 +431,26 @@
       text = customText;
       report("使用自定义回复文案: " + text.slice(0, 40));
     } else {
-      const resp = await chrome.runtime.sendMessage({ action: "llm",
-        prompt: "为抖音视频《" + title + "》写1条15字内仿真人互动评论，只输出JSON数组如[\"文本\"]" });
-      if (!resp || resp.error) return "LLM失败: " + (resp && resp.error || "no resp");
+      let resp = null;
       try {
-        const raw = String(resp.content || "").trim().replace(/^```(json)?\s*|\s*```$/g, "").trim();
-        const arr = JSON.parse(raw);
-        text = Array.isArray(arr) ? String(arr[0] || "") : "";
-      } catch { return "LLM解析失败: " + String(resp.content).slice(0, 80); }
-      if (!text || typeof text !== "string") return "LLM返回文本为空";
+        resp = await chrome.runtime.sendMessage({ action: "llm",
+          prompt: "为抖音视频《" + title + "》写1条15字内仿真人互动评论，只输出JSON数组如[\"文本\"]" });
+      } catch (e) { resp = { error: String(e) }; }
+      if (resp && resp.error) {
+        // 没配模型/模型不可用 → 本地模板兜底，流程照常
+        text = localFallbackText(title);
+        report("模型不可用(" + String(resp.error).slice(0, 40) + ")，使用本地模板文案");
+      } else {
+        try {
+          const raw = String(resp.content || "").trim().replace(/^```(json)?\s*|\s*```$/g, "").trim();
+          const arr = JSON.parse(raw);
+          text = Array.isArray(arr) ? String(arr[0] || "") : "";
+        } catch { text = ""; }
+        if (!text) {
+          text = localFallbackText(title);
+          report("模型返回解析失败，使用本地模板文案");
+        }
+      }
       report("评论文案: " + text);
     }
 
