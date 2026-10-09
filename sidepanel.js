@@ -156,7 +156,6 @@ $("btnSearch").onclick = async () => {
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["auto.js"] });
     await chrome.tabs.sendMessage(tab.id, { action: "autoRun", maxN, gapSec });
     status("已启动，浏览器里右上角会显示每一步");
-    $("btnStopAuto").disabled = false;
   } catch (e) {
     status("启动失败: " + e.message + "（页面可能还在加载，稍后点⚡开始自动）", true);
   }
@@ -214,32 +213,7 @@ chrome.runtime.onMessage.addListener((m) => {
   }
 });
 
-$("btnAuto").onclick = async () => {
-  let tab;
-  try { tab = await getReadyTab(); } catch (e) { return status(e.message, true); }
-  const maxN = Math.max(1, Math.min(20, parseInt($("maxN").value) || 3));
-  const gapSec = Math.max(15, Math.min(3600, parseInt($("gapSec").value) || 90));
-  if (!confirm(`全自动将自动打开视频并直接发送评论（发送无人工确认）。\n本次最多 ${maxN} 条，间隔 ${gapSec}s。\n确认开始？`)) return;
-  try {
-    await chrome.tabs.update(tab.id, { active: true });   // 切到抖音页，操作全程可见
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["auto.js"] });
-    await chrome.tabs.sendMessage(tab.id, { action: "autoRun", maxN, gapSec });
-    status("自动模式已启动，监视器实时显示每步");
-    const wb = $("watchBox");
-    wb.style.display = "block";
-    wb.innerHTML = "";
-    watchLog("=== 全自动开始 ===", "step");
-    watchLog("来源页面: " + (tab.url || "").slice(0, 70), "step");
-    watchLog("计划最多 " + maxN + " 条 / 最小间隔 " + gapSec + " 秒", "step");
-    $("btnStopAuto").disabled = false;
-  } catch (e) { status("启动失败: " + e.message, true); }
-};
 
-$("btnStopAuto").onclick = async () => {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  try { await chrome.tabs.sendMessage(tab.id, { action: "autoStop" }); status("停止请求已发"); } catch {}
-  $("btnStopAuto").disabled = true;
-};
 
 
 // 顶部推广位：点击打开注册页；若用户没填 baseUrl 同时预填

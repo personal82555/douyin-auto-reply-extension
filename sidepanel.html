@@ -107,6 +107,13 @@
     <input type="text" id="kw" placeholder="关键词，回车搜">
     <button id="btnSearch" class="primary">▶ 开始执行</button>
   </div>
+  <div class="row" style="margin-top:4px;align-items:center">
+    <span style="font-size:12px;white-space:nowrap">本次最多</span>
+    <input type="number" id="maxN" value="3" min="1" max="20" style="width:56px" title="本次最多评论几条">
+    <span style="font-size:12px;white-space:nowrap">条，每条间隔</span>
+    <input type="number" id="gapSec" value="90" min="15" max="3600" style="width:56px" title="两条评论之间的最小间隔(秒)">
+    <span style="font-size:12px;white-space:nowrap">秒</span>
+  </div>
   <div class="lbl" style="margin-top:4px">输入关键词 → 自动打开搜索页 → 模拟真人逐个点开视频并评论（城市如「杭州」会自动拼在关键词前）</div>
 </div>
 
@@ -130,20 +137,7 @@
   <div id="doneList" style="max-height:240px;overflow-y:auto"></div>
 </div>
 
-<div class="sec">
-  <div class="lbl">⚡ 全自动模式（自动点开视频+发评，封号风险自担）</div>
-  <div class="row">
-    <span style="font-size:12px;white-space:nowrap">最多评论</span>
-    <input type="number" id="maxN" value="3" min="1" max="20" style="width:60px" title="本次最多发几条">
-    <span style="font-size:12px;white-space:nowrap">条视频，每隔</span>
-    <input type="number" id="gapSec" value="90" min="15" max="3600" style="width:60px" title="两次发评最小间隔(秒)">
-    <span style="font-size:12px;white-space:nowrap">秒发一条</span>
-    <button id="btnAuto" class="primary">开始自动</button>
-    <button id="btnStopAuto" disabled>停止</button>
-  </div>
-</div>
-
-<div class="foot">打开列表页 → 点「开始自动」→ 浏览器自动切到视频页，页面右上角实时显示当前步骤（展开评论区 / 逐字打字 / 点击发送），全程像真人操作，你亲眼看着它完成</div>
+<div class="foot">打开列表页 → 点「开始自动」→ 浏览器自动切到视频页，页面右上角实时显示当前步骤（展开评论区 / 逐字打字 / 点击发送），全程像真人操作，你亲眼看着它完成；条数与间隔在上方设置</div>
 
 <script src="sidepanel.js"></script>
 </body>
