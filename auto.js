@@ -199,6 +199,8 @@
         return;   // 新页面的 auto.js 接管
       } catch (e) {
         report("单条失败: " + String(e));
+        const diag2 = await aiDiagnose(String(e), it.title || "");
+        report(diag2);
         await sleep(3000);
       }
     }
@@ -223,7 +225,13 @@
       if (location.pathname.startsWith("/video/")) {
         const r = await postOnce(state.gapSec, state);
         if (r === "OK" || r === "OK(enter)") { state.sent++; report(`已发送 ${state.sent} 条`); }
-        else { report("未成功: " + r); showStep("✗ 未发送: " + r, "fail"); }
+        else {
+          report("未成功: " + r);
+          showStep("✗ 未发送: " + String(r).slice(0, 40), "fail");
+          const diag = await aiDiagnose(String(r), state.title || "");
+          report(diag);
+          showStep(diag.slice(0, 60), "fail");
+        }
         // 等待间隔
         const wait = Math.max(15, state.gapSec + Math.floor(rand(-10, 30)));
         report(`休眠 ${wait}s 后继续`);
@@ -454,6 +462,31 @@
     return (document.title || "").includes("验证码") ||
            !!document.querySelector('iframe[src*="verifycenter"], iframe[src*="captcha"]');
   }
+
+  // —— AI 排障：失败时把现场交给 AI 分析原因 + 下一步 ——
+  async function aiDiagnose(reason, title) {
+    try {
+      let dom = "";
+      try {
+        dom = "url=" + location.href.slice(0, 80) +
+          " | title=" + (document.title || "").slice(0, 40) +
+          " | 评论框存在=" + !!document.querySelector('div[contenteditable="true"]') +
+          " | 评论图标存在=" + !!document.querySelector('[data-e2e="comment-icon"]') +
+          " | 发送按钮存在=" + !!document.querySelector('[data-e2e="comment-post"]') +
+          " | video数=" + document.querySelectorAll("video").length +
+          " | 页面正文前100字=" + (document.body.innerText || "").replace(/\s+/g, " ").slice(0, 100);
+      } catch {}
+      const resp = await chrome.runtime.sendMessage({ action: "llm", prompt:
+        "你是抖音网页自动化助手的排障专家。视频《" + title + "》操作失败。\n" +
+        "失败原因: " + reason + "\n" +
+        "页面状态: " + dom + "\n" +
+        "请用一行中文回答：①可能的真实原因 ②建议的下一步动作（如手动做什么/代码该改什么），80字以内，直接输出。" });
+      if (resp && resp.error) return "AI排障不可用: " + resp.error;
+      const ans = String(resp.content || "").trim().replace(/^[\s\S]*?(?=[^。\n])/, "").slice(0, 120);
+      return "AI分析: " + (ans || resp.content || "");
+    } catch (e) { return "AI排障失败: " + String(e); }
+  }
+
   async function record(title, text) {
     try {
       const hr = await chrome.runtime.sendMessage({ action: "addRecord",
