@@ -65,7 +65,8 @@ $("saveCfg").onclick = async () => {
     apiKey: $("apiKey").value.trim(),
     model: $("model").value.trim(),
   });
-  status("配置已保存 ✓");
+  const mm = $("testMsg");
+  if (mm) { mm.textContent = "配置已保存 ✓"; mm.style.color = "#0a7"; }
 };
 $("testCfg").onclick = async () => {
   const m = $("testMsg");
