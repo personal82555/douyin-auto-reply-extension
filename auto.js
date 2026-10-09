@@ -83,6 +83,27 @@
     } catch {}
   }
 
+
+  // 暂停视频播放，防止播完自动切到下一条（评论对象跑偏）
+  function pauseAllVideos() {
+    let n = 0;
+    try {
+      document.querySelectorAll("video").forEach(v => {
+        if (!v.paused) { v.pause(); v.currentTime = Math.min(v.currentTime, 0.5); n++; }
+      });
+    } catch {}
+    return n;
+  }
+  function keepVideosPaused(seconds) {
+    pauseAllVideos();
+    let t = 0;
+    const iv = setInterval(() => {
+      t += 1;
+      pauseAllVideos();
+      if (t >= seconds) clearInterval(iv);
+    }, 2000);
+  }
+
   function findCardElement(it) {
     const href = it.href || "";
     const vidId = href.split("/video/")[1];
@@ -180,8 +201,12 @@
       state.navigated = true;
       sessionStorage.removeItem("dyAutoState");
       report(`进入视频页: ${state.title}，等页面稳定...`);
-      showStep("① 页面加载中，模拟观看视频…");
-      await sleep(5000);
+      showStep("① 页面加载中，暂停视频防止自动切下一条…");
+      await sleep(3500);
+      const paused = pauseAllVideos();
+      report(paused ? "已暂停视频播放" : "没找到播放中的video（可能还没加载）");
+      keepVideosPaused(60);   // 60秒内每2秒复查一次，React重渲染也按得住
+      showStep("① 视频已暂停，准备评论…");
       if (location.pathname.startsWith("/video/")) {
         const r = await postOnce(state.gapSec, state);
         if (r === "OK" || r === "OK(enter)") { state.sent++; report(`已发送 ${state.sent} 条`); }
