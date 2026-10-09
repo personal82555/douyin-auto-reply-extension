@@ -114,42 +114,50 @@ async function askContent(action, payload) {
   return res;
 }
 
-$("btnHot").onclick = async () => {
-  status("抓取中...");
-  try {
-    const r = await askContent("grab");
-    if (r.error && r.error.length) throw new Error(r.error);
-    if (!r.items || !r.items.length) throw new Error("本页没抓到视频卡片（抖音页面可能弹验证码）");
-    renderList(r.items, "本页");
-    status("抓到 " + r.items.length + " 条");
-  } catch (e) { status("抓取失败: " + e.message, true); }
-};
 
+$("kw").addEventListener("keydown", e => { if (e.key === "Enter") $("btnSearch").click(); });
 $("btnSearch").onclick = async () => {
   const city = ($("city").value || "").trim();
   const base = $("kw").value.trim();
   if (city) chrome.storage.local.set({ city });
   const kw = city && base ? (city + " " + base) : base;
   if (!kw) return status("请输入关键词", true);
-  status("搜索中...");
+
+  // 1) 确认/拿到一个抖音标签页
+  let tab;
   try {
-    let r = await askContent("search", { kw });
-    if (r && r.navigating) {
-      // 硬导航：页面上脚本会重启。轮询侧栏取结果
-      status("页面跳转中，等待结果...");
-      for (let i = 0; i < 15; i++) {
-        await new Promise(res => setTimeout(res, 2000));
-        try {
-          r = await askContent("getSearchResult", {});
-          if (r && r.items && r.items.length >= 5) break;
-        } catch { /* 页面还在导航中，继续等 */ }
-      }
+    const [t] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (t && /douyin\.com/.test(t.url || "")) tab = t;
+    else {
+      const [d] = await chrome.tabs.query({ url: "*://www.douyin.com/*" });
+      tab = d || await chrome.tabs.create({ url: "https://www.douyin.com/" });
     }
-    if (r.error && r.error.length) throw new Error(r.error);
-    if (!r.items || !r.items.length) throw new Error("没抓到结果（可能弹验证码或网络问题）");
-    renderList(r.items, "搜索");
-    status("搜到 " + r.items.length + " 条");
-  } catch (e) { status("搜索失败: " + e.message, true); }
+  } catch { return status("找不到可用的抖音标签页", true); }
+
+  const url = "https://www.douyin.com/search/" + encodeURIComponent(kw) + "?type=video";
+  status("打开搜索页: " + kw + "（浏览器会切到前台）…");
+  watchLog("搜索: " + kw, "step");
+  try {
+    await chrome.tabs.update(tab.id, { url, active: true });   // 真实导航+前台可见
+  } catch (e) { return status("导航失败: " + e.message, true); }
+
+  // 2) 等搜索页渲染 → 注入自动脚本 → 开跑（auto.js 自己抓本页列表并开始模拟点击）
+  const maxN = Math.max(1, Math.min(20, parseInt($("maxN").value) || 3));
+  const gapSec = Math.max(15, Math.min(3600, parseInt($("gapSec").value) || 90));
+  saveAutoCounts();
+  if (!$("kwAutoOn").checked && !confirm(
+      "将在搜索结果页自动逐个点开视频并发送评论（最多 " + maxN + " 条 / 间隔 " + gapSec + " 秒）。\n确认开始？"))
+    return;
+  status("等待搜索页加载（8秒）…");
+  await new Promise(r => setTimeout(r, 8000));
+  try {
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["auto.js"] });
+    await chrome.tabs.sendMessage(tab.id, { action: "autoRun", maxN, gapSec });
+    status("已启动，浏览器里右上角会显示每一步");
+    $("btnStopAuto").disabled = false;
+  } catch (e) {
+    status("启动失败: " + e.message + "（页面可能还在加载，稍后点⚡开始自动）", true);
+  }
 };
 
 function renderList(items, source) {

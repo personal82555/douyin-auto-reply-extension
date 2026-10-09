@@ -109,8 +109,16 @@
     // 只评论"当前页面"上抓到的视频（你正在看的搜索结果/视频列表）
     let items = grabItems();
     if (!Array.isArray(items)) items = [];
+    // 搜索页渲染慢：最多再等15秒轮询
+    for (let w = 0; w < 15 && !items.length; w++) {
+      showStep("等待搜索结果渲染…(" + (w + 1) + "s)");
+      await sleep(1000);
+      items = grabItems();
+      if (!Array.isArray(items)) items = [];
+    }
     if (!items.length) {
       report("当前页面没抓到视频 — 请先打开网站搜索结果页或视频列表页再点「开始自动」");
+      showStep("✗ 本页没抓到视频", "fail");
       return;
     }
     // 关键词自动回复：命中标题的帖子优先，只回匹配的

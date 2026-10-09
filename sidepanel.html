@@ -97,12 +97,9 @@
   <div class="row">
     <input type="text" id="city" placeholder="固定城市，如：杭州" style="width:40%">
     <input type="text" id="kw" placeholder="关键词，回车搜">
-    <button id="btnSearch">搜索</button>
+    <button id="btnSearch" class="primary">搜索并自动评论</button>
   </div>
-  <div class="row" style="margin-top:4px">
-    <button id="btnHot" class="primary" style="flex:1">抓取当前页面视频</button>
-  </div>
-  <div class="lbl" style="margin-top:4px">填了城市后搜索自动带城市前缀（如「杭州 宽带」），城市会被记住</div>
+  <div class="lbl" style="margin-top:4px">输入关键词 → 自动打开搜索页 → 模拟真人逐个点开视频并评论（城市如「杭州」会自动拼在关键词前）</div>
 </div>
 
 <div class="sec">
@@ -120,7 +117,6 @@
 </div>
 
 <div id="status"></div>
-<div id="list"></div>
 
 <div class="sec">
   <div class="lbl">⚡ 全自动模式（自动点开视频+发评，封号风险自担）</div>
