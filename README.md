@@ -1,4 +1,4 @@
-# 抖音热门视频自动回复助手 (Douyin Auto Reply Assistant)
+# 抖音评论辅助工具 (Douyin Auto Reply Assistant)
 
 一款 Chrome/Edge 浏览器扩展（Manifest V3），在抖音网页版里搜索热门视频、用 LLM 生成仿真人互动评论、半自动/全自动填入并发送评论。所有 LLM 配置存在本地，可对接任意 OpenAI 兼容接口。
 
