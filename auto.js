@@ -419,7 +419,9 @@
           showStep("✗ 未发送: " + String(r).slice(0, 40), "fail");
           const diag = await aiDiagnose(String(r), state.title || "");
           report(diag);
-          showStep(diag.slice(0, 60), "fail");
+          const stopNow = await bumpFails(r);
+          showStep(stopNow ? "⏹ 连续失败5次，自动停止" : diag.slice(0, 60), "fail");
+          if (stopNow) return;
         }
         // 等待间隔
         const wait = Math.max(15, state.gapSec + Math.floor(rand(-10, 30)));
