@@ -70,28 +70,6 @@ async function loadCfg() {
 }
 
 // 关键词自动回复规则：保存 + 图片转 dataURL
-$("saveAutoRule").onclick = async () => {
-  const rule = {
-    autoKeywords: $("autoKeywords").value,
-    autoReplyText: $("autoReplyText").value,
-    kwAutoOn: $("kwAutoOn").checked
-  };
-  const f = $("autoImage").files && $("autoImage").files[0];
-  if (f) {
-    const dataUrl = await new Promise((res, rej) => {
-      const r = new FileReader();
-      r.onload = () => res(r.result);
-      r.onerror = rej;
-      r.readAsDataURL(f);
-    });
-    rule.autoImageDataUrl = dataUrl;
-    $("imgPreview").src = dataUrl;
-    $("imgPreview").style.display = "block";
-  }
-  await chrome.storage.local.set(rule);
-  _ruleCache = { autoKeywords: rule.autoKeywords, kwAutoOn: rule.kwAutoOn };
-  status("关键词自动回复规则已保存" + (rule.kwAutoOn ? "（已启用）" : "（未启用）"));
-};
 
 // 全自动启动前记忆条数/间隔
 async function saveAutoCounts() {
@@ -228,6 +206,37 @@ function renderList(items, source) {
   });
 }
 
+
+
+// 关键词规则自动保存（无保存按钮）：改动即存
+function autoSaveRule(extra) {
+  const rule = Object.assign({
+    autoKeywords: $("autoKeywords").value,
+    autoReplyText: $("autoReplyText").value,
+    kwAutoOn: $("kwAutoOn").checked
+  }, extra || {});
+  chrome.storage.local.set(rule);
+}
+["autoKeywords", "autoReplyText"].forEach(id => {
+  const el = $(id);
+  if (el) el.addEventListener("change", () => autoSaveRule());
+});
+const kwOn = $("kwAutoOn");
+if (kwOn) kwOn.addEventListener("change", () => autoSaveRule());
+const imgInput = $("autoImage");
+if (imgInput) imgInput.addEventListener("change", async () => {
+  const f = imgInput.files && imgInput.files[0];
+  if (!f) return;
+  const dataUrl = await new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(f);
+  });
+  const prev = $("imgPreview");
+  if (prev) { prev.src = dataUrl; prev.style.display = "block"; }
+  autoSaveRule({ autoImageDataUrl: dataUrl });
+});
 
 loadCfg();
 

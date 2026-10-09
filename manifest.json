@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "抖音评论辅助工具",
-  "version": "1.12.1",
+  "version": "1.12.2",
   "description": "抖音网页版评论辅助：搜索热门视频，AI生成候选评论文案，一键填入评论框由你审阅后发送；支持关键词筛选与评论记录统计。",
   "permissions": [
     "storage",

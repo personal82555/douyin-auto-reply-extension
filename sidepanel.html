@@ -99,36 +99,32 @@
 </div>
 
 <div class="sec">
-  <div class="lbl">一键执行（输入关键词 → 自动打开搜索 → 模拟真人逐个评论）</div>
+  <div class="lbl">关键词回复（标题含关键词时用下面的文字/图片）</div>
+  <textarea id="autoKeywords" rows="2" placeholder="关键词每行一个，例如：&#10;宽带&#10;装宽带"></textarea>
+  <textarea id="autoReplyText" rows="2" placeholder="回复文字（只发图可留空）" style="margin-top:4px"></textarea>
   <div class="row">
-    <input type="text" id="city" placeholder="固定城市，如：杭州" style="width:40%">
-    <input type="text" id="kw" placeholder="关键词，回车搜">
+    <label style="font-size:12px;cursor:pointer"><input type="file" id="autoImage" accept="image/*" style="width:150px;font-size:11px"> 附图(可选)</label>
+    <label style="font-size:12px"><input type="checkbox" id="kwAutoOn"> 启用</label>
   </div>
-  <div class="row" style="margin-top:6px">
-    <button id="btnSearch" class="primary" style="flex:1;height:40px;font-size:15px;font-weight:bold">▶ 开始执行</button>
-    <span id="runTimer" style="font-size:13px;font-weight:bold;color:#fe2c55;white-space:nowrap;min-width:92px;text-align:right"></span>
-  </div>
-  <div class="row" style="margin-top:4px;align-items:center">
-    <span style="font-size:12px;white-space:nowrap">本次最多</span>
-    <input type="number" id="maxN" value="3" min="1" max="20" style="width:56px" title="本次最多评论几条">
-    <span style="font-size:12px;white-space:nowrap">条，每条间隔</span>
-    <input type="number" id="gapSec" value="90" min="15" max="3600" style="width:56px" title="两条评论之间的最小间隔(秒)">
-    <span style="font-size:12px;white-space:nowrap">秒</span>
-  </div>
-  <div class="lbl" style="margin-top:4px">输入关键词 → 自动打开搜索页 → 模拟真人逐个点开视频并评论（城市如「杭州」会自动拼在关键词前）</div>
+  <img id="imgPreview" alt="" style="max-width:140px;max-height:80px;border:1px solid #ddd;border-radius:4px;margin-top:4px;display:none">
 </div>
 
 <div class="sec">
-  <div class="lbl">🎯 关键词自动回复（帖子标题含关键词 → 自动用自定义文字/图片回复）</div>
-  <textarea id="autoKeywords" rows="2" placeholder="关键词每行一个，例如：&#10;宽带&#10;装宽带&#10;网络办理"></textarea>
-  <textarea id="autoReplyText" rows="2" placeholder="自动回复文字（只发图片可留空）" style="margin-top:4px"></textarea>
+  <div class="lbl">一键执行</div>
   <div class="row">
-    <label style="font-size:12px;cursor:pointer"><input type="file" id="autoImage" accept="image/*" style="width:150px;font-size:11px"> 附图(可选)</label>
+    <input type="text" id="city" placeholder="城市(可选)，如：杭州" style="width:40%">
+    <input type="text" id="kw" placeholder="关键词">
   </div>
-  <img id="imgPreview" alt="" style="max-width:140px;max-height:80px;border:1px solid #ddd;border-radius:4px;margin-top:4px;display:none">
-  <div class="row">
-    <label style="font-size:12px"><input type="checkbox" id="kwAutoOn"> 启用（全自动时只回匹配的帖子）</label>
-    <button id="saveAutoRule">保存规则</button>
+  <div class="row" style="margin-top:4px;align-items:center">
+    <span style="font-size:12px;white-space:nowrap">最多</span>
+    <input type="number" id="maxN" value="3" min="1" max="20" style="width:56px" title="本次最多评论几条">
+    <span style="font-size:12px;white-space:nowrap">条 / 间隔</span>
+    <input type="number" id="gapSec" value="90" min="15" max="3600" style="width:56px" title="两条评论之间的最小间隔(秒)">
+    <span style="font-size:12px;white-space:nowrap">秒</span>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <button id="btnSearch" class="primary" style="flex:1;height:42px;font-size:16px;font-weight:bold">▶ 开始执行</button>
+    <span id="runTimer" style="font-size:13px;font-weight:bold;color:#fe2c55;white-space:nowrap;min-width:92px;text-align:right"></span>
   </div>
 </div>
 
@@ -143,7 +139,7 @@
   <div id="logBox"></div>
 </div>
 
-<div class="foot">打开列表页 → 点「开始自动」→ 浏览器自动切到视频页，页面右上角实时显示当前步骤（展开评论区 / 逐字打字 / 点击发送），全程像真人操作，你亲眼看着它完成；条数与间隔在上方设置</div>
+<div class="foot">填关键词 → 点「▶ 开始执行」，其余全自动</div>
 
 <script src="sidepanel.js"></script>
 </body>
