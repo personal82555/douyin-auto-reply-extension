@@ -24,9 +24,18 @@
           const href = c.getAttribute("href") || "";
           if (!href.includes("/video/")) continue;
           const container = c.closest("li") || c.closest("[class*=cardWrapper]") || c;
-          let title = ((container.innerText || "").trim().split("\n")
-            .map(s => s.trim()).filter(s => s.length > 4 && !/^\d+(\.\d+)?[wWkK万]?$/.test(s))
-            .slice(0, 1).join(" ")) || (c.getAttribute("title") || "").trim();
+          // 4级标题候选（与 content.js 同步）：过滤时长/日期行 → title attr → img alt → aria-label
+          const lines = (container.innerText || "").trim().split("\n")
+            .map(x => x.trim())
+            .filter(sx => sx.length > 4
+              && !/^\d+(\.\d+)?[wWkK万]?$/.test(sx)
+              && !/^\d{1,2}:\d{2}$/.test(sx)
+              && !/^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}$/.test(sx));
+          const img = container.querySelector("img");
+          let title = (lines[0] ||
+            c.getAttribute("title") ||
+            (img ? (img.alt || img.getAttribute("aria-label") || "") : "") ||
+            c.getAttribute("aria-label") || "").trim();
           if (!title || title.length < 4) continue;
           let link;
           if (href.startsWith("http")) link = href;
@@ -148,12 +157,16 @@
     const kws = String(rule.autoKeywords || "").split(/\n+/).map(x => x.trim()).filter(x => x.length > 0);
     if (rule.kwAutoOn && kws.length) {
       const matched = items.filter(it => kws.some(k => (it.title || "").includes(k)));
+      report("本页抓到 " + items.length + " 条，示例标题: " +
+        items.slice(0, 3).map(x => (x.title || "").slice(0, 16)).join(" | "));
       if (!matched.length) {
-        report("关键词模式开启，但本页没命中任何关键词(" + kws.join("/") + ")，跳过");
+        report("关键词(" + kws.join("/") + ")未命中，跳过。已抓标题见上一行");
+        showStep("✗ 关键词未命中，检查抓到的标题", "fail");
         return;
       }
       items = matched;
-      report("关键词命中 " + items.length + " 条，只回这些");
+      report("关键词命中 " + items.length + " 条，只回这些: " +
+        items.slice(0, 3).map(x => (x.title || "").slice(0, 14)).join(" | "));
     }
     const custom = (rule.kwAutoOn && rule.autoReplyText) ? String(rule.autoReplyText) : "";
     const customImg = (rule.kwAutoOn && rule.autoImageDataUrl) ? String(rule.autoImageDataUrl) : "";
