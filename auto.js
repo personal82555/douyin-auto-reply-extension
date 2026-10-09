@@ -60,6 +60,29 @@
   });
 
 
+
+  // —— 页面内步骤浮窗：让用户在真实页面上看到操作进度 ——
+  function showStep(text, tone) {
+    try {
+      let box = document.getElementById("__dyStepBox");
+      if (!box) {
+        box = document.createElement("div");
+        box.id = "__dyStepBox";
+        box.style.cssText =
+          "position:fixed;top:14px;right:14px;z-index:2147483647;" +
+          "background:rgba(20,22,31,.94);color:#7dfcd4;font:13px/1.6 \'Microsoft YaHei\',sans-serif;" +
+          "padding:10px 14px;border-radius:8px;box-shadow:0 4px 18px rgba(0,0,0,.35);" +
+          "max-width:320px;pointer-events:none;transition:opacity .3s";
+        document.documentElement.appendChild(box);
+      }
+      const color = tone === "fail" ? "#ff7b72" : tone === "ok" ? "#8ef7b7" : "#ffd76e";
+      box.innerHTML = "<div style='font-size:11px;color:#8a8fa3'>🤖 抖音评论辅助工具 正在操作</div>"
+        + "<div style='color:" + color + "'>" + text + "</div>";
+      box.style.display = "block";
+      if (tone === "done") { setTimeout(() => { box.style.display = "none"; }, 4000); }
+    } catch {}
+  }
+
   function findCardElement(it) {
     const href = it.href || "";
     const vidId = href.split("/video/")[1];
@@ -113,6 +136,7 @@
       if (sent >= maxN) break;
       try {
         report("→ " + (sent + 1) + "/" + maxN + " 点击卡片: " + it.title);
+        showStep((sent + 1) + "/" + maxN + " 正在点开视频: " + (it.title || "").slice(0, 24));
         // 像真人一样：滚到卡片位置 → 鼠标按下抬起点击卡片进入视频（不用 location.href 硬跳）
         const el = findCardElement(it);
         if (!el) { report("没找到该卡片DOM，跳过"); continue; }
@@ -143,11 +167,12 @@
       state.navigated = true;
       sessionStorage.removeItem("dyAutoState");
       report(`进入视频页: ${state.title}，等页面稳定...`);
+      showStep("① 页面加载中，模拟观看视频…");
       await sleep(5000);
       if (location.pathname.startsWith("/video/")) {
         const r = await postOnce(state.gapSec, state);
-        if (r === "OK") { state.sent++; report(`已发送 ${state.sent} 条`); }
-        else report("未成功: " + r);
+        if (r === "OK" || r === "OK(enter)") { state.sent++; report(`已发送 ${state.sent} 条`); }
+        else { report("未成功: " + r); showStep("✗ 未发送: " + r, "fail"); }
         // 等待间隔
         const wait = Math.max(15, state.gapSec + Math.floor(rand(-10, 30)));
         report(`休眠 ${wait}s 后继续`);
@@ -288,6 +313,7 @@
 
     // ── 仿人流程 ──
     // 1. 模拟看完视频再操作（等3~6s）
+    showStep("② 观看视频 3~6 秒…");
     await sleep(3000 + rand(0, 3000));
 
     // 2. 点开评论区：人手动作点右下/右侧的评论icon
@@ -296,6 +322,7 @@
       const icon = await findVisibleCommentIcon();
       if (!icon) return "no_comment_icon（找不到评论按钮）";
       report("点击评论按钮展开评论区...");
+      showStep("③ 像真人一样点开评论区…");
       await humanClick(icon);
       await sleep(2500 + rand(0, 1500));
       editor = await findCommentEditor();
@@ -304,6 +331,7 @@
 
     // 3. 点击输入框获得焦点（像人一样先点一下框）
     report("点击评论框获焦...");
+    showStep("④ 点击评论框…");
     await humanClick(editor);
     await sleep(600 + rand(0, 600));
     // 确保焦点在框内
@@ -334,6 +362,7 @@
 
     // 4. 逐字输入（模拟打字节奏 60~180ms/字，带偶发停顿）
     report("逐字输入评论...");
+    showStep("⑤ 逐字输入中: " + text.slice(0, 20));
     for (const ch of text) {
       document.execCommand("insertText", false, ch);
       await sleep(50 + Math.random() * 110);
@@ -362,9 +391,11 @@
       return "OK(enter)";
     }
     report("点击发送...");
+    showStep("⑥ 点击发送…");
     await humanClick(sb);
     await sleep(1500);
     await record(title, text);
+    showStep("✓ 评论已发送：" + text.slice(0, 20), "ok");
     return "OK";
   }
 

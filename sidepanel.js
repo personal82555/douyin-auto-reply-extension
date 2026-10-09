@@ -170,56 +170,14 @@ function renderList(items, source) {
     link.title = href;
     link.onclick = (ev) => { ev.stopPropagation(); chrome.tabs.create({ url: href }); };
     d.insertBefore(link, d.querySelector(".gen"));
-    d.querySelector(".gen").onclick = async (ev) => {
-      ev.stopPropagation();
-      await genDrafts(it.title || ("(视频 " + (i + 1) + ")"), href);
-    };
-    d.onclick = async () => await genDrafts(it.title || ("(视频 " + (i + 1) + ")"), href);
+    const gen = d.querySelector(".gen");
+    gen.textContent = "详情→";
+    gen.onclick = (ev) => { ev.stopPropagation(); chrome.tabs.create({ url: href }); };
+    d.onclick = () => chrome.tabs.create({ url: href });
     list.appendChild(d);
   });
 }
 
-async function genDrafts(title, href) {
-  status("LLM生成中...");
-  $("drafts").innerHTML = "";
-  try {
-    const out = await llmChat([
-      { role: "system", content: "你只输出JSON数组，不做任何解释。" },
-      { role: "user", content:
-        `你是抖音评论区一个真实用户，要去热门视频《${title}》下写3条自然互动评论。\n` +
-        `规则：\n1. 每条15字以内，口语化像真人随手发的\n2. 不用emoji堆砌，最多一个，别用套话\n3. 结合标题有具体感，可幽默/提问/共鸣\n4. 3条风格有差异\n5. 只输出JSON数组（双引号包裹每项）` }
-    ], 600);
-    const arr = parseArray(out);
-    const box = $("drafts");
-    arr.slice(0, 3).forEach(t => {
-      const d = document.createElement("div");
-      d.className = "draft";
-      d.innerHTML = `<div class="txt"></div><div class="use"><button>📋 复制并填入评论区</button></div>`;
-      d.querySelector(".txt").textContent = t;
-      d.querySelector("button").onclick = async () => {
-        await navigator.clipboard.writeText(t);
-        status("已复制，尝试填入评论区...");
-        try {
-          const r = await askContent("fill", { text: t });
-          if (r.ok) {
-            chrome.runtime.sendMessage({ action: "addRecord", url: href, title, text: t });
-            status("已填入并记录 ✓ 请检查后点发送");
-          } else {
-            status("已复制（自动填入失败: " + r.reason + "），手动粘贴即可");
-          }
-        } catch (e) { status("已复制，手动粘贴即可（填入失败: " + e.message + "）"); }
-      };
-      box.appendChild(d);
-    });
-    if (href) { /* 供用户回页面点该视频 */
-      const tip = document.createElement("div");
-      tip.className = "draft"; tip.style.cssText = "border:none;font-size:11px;color:#888";
-      tip.textContent = "视频: " + (href.length > 50 ? href.slice(0, 50) + "…" : href);
-      box.appendChild(tip);
-    }
-    status("生成完成 ✓ 选一条点「复制并填入」");
-  } catch (e) { status("生成失败: " + e.message, true); }
-}
 
 loadCfg();
 
@@ -253,6 +211,7 @@ $("btnAuto").onclick = async () => {
   const gapSec = Math.max(15, Math.min(3600, parseInt($("gapSec").value) || 90));
   if (!confirm(`全自动将自动打开视频并直接发送评论（发送无人工确认）。\n本次最多 ${maxN} 条，间隔 ${gapSec}s。\n确认开始？`)) return;
   try {
+    await chrome.tabs.update(tab.id, { active: true });   // 切到抖音页，操作全程可见
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["auto.js"] });
     await chrome.tabs.sendMessage(tab.id, { action: "autoRun", maxN, gapSec });
     status("自动模式已启动，监视器实时显示每步");
