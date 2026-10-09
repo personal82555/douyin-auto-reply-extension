@@ -123,23 +123,27 @@ $("btnSearch").onclick = async () => {
   const kw = city && base ? (city + " " + base) : base;
   if (!kw) return status("请输入关键词", true);
 
-  // 1) 确认/拿到一个抖音标签页
-  let tab;
+  // 1) 拿到/创建抖音标签页（用户没打开抖音就帮他开一个）
+  const url = "https://www.douyin.com/search/" + encodeURIComponent(kw) + "?type=video";
+  let tab = null;
   try {
     const [t] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (t && /douyin\.com/.test(t.url || "")) tab = t;
-    else {
-      const [d] = await chrome.tabs.query({ url: "*://www.douyin.com/*" });
-      tab = d || await chrome.tabs.create({ url: "https://www.douyin.com/" });
+    if (!tab) {
+      const douyinTabs = await chrome.tabs.query({ url: "*://www.douyin.com/*" });
+      tab = douyinTabs.find(x => x.id) || null;
     }
-  } catch { return status("找不到可用的抖音标签页", true); }
+    if (tab) {
+      await chrome.tabs.update(tab.id, { url, active: true });          // 已有标签: 直达搜索页
+    } else {
+      tab = await chrome.tabs.create({ url, active: true });            // 没开抖音: 新建并直达
+      status("已为你打开抖音搜索页");
+    }
+    if (!tab || !tab.id) throw new Error("拿不到标签页 id");
+  } catch (e) { return status("打开抖音失败: " + e.message, true); }
 
-  const url = "https://www.douyin.com/search/" + encodeURIComponent(kw) + "?type=video";
   status("打开搜索页: " + kw + "（浏览器会切到前台）…");
   watchLog("搜索: " + kw, "step");
-  try {
-    await chrome.tabs.update(tab.id, { url, active: true });   // 真实导航+前台可见
-  } catch (e) { return status("导航失败: " + e.message, true); }
 
   // 2) 等搜索页渲染 → 注入自动脚本 → 开跑（auto.js 自己抓本页列表并开始模拟点击）
   const maxN = Math.max(1, Math.min(20, parseInt($("maxN").value) || 3));
